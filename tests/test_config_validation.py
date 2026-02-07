@@ -1,10 +1,11 @@
 """Tests for configuration schema validation."""
 import pytest
 
-from src.config_parser import ConfigError, ConfigParser
+from src.config_parser import ConfigParser
+from src.error_codes import ConfigurationError
 
 
-def test_valid_config_passes_validation():
+def test_valid_config_passes_validation() -> None:
     """Test that valid configuration passes schema validation."""
     config = {
         "DicomWebOAuth": {
@@ -28,7 +29,7 @@ def test_valid_config_passes_validation():
     assert servers["server1"]["ClientId"] == "client123"
 
 
-def test_missing_required_field_fails_validation():
+def test_missing_required_field_fails_validation() -> None:
     """Test that missing required fields fail validation."""
     config = {
         "DicomWebOAuth": {
@@ -43,7 +44,7 @@ def test_missing_required_field_fails_validation():
         }
     }
 
-    with pytest.raises(ConfigError) as exc_info:
+    with pytest.raises(ConfigurationError) as exc_info:
         ConfigParser(config)
 
     assert (
@@ -51,7 +52,7 @@ def test_missing_required_field_fails_validation():
     )
 
 
-def test_invalid_type_fails_validation():
+def test_invalid_type_fails_validation() -> None:
     """Test that invalid field types fail validation."""
     config = {
         "DicomWebOAuth": {
@@ -67,7 +68,7 @@ def test_invalid_type_fails_validation():
         }
     }
 
-    with pytest.raises(ConfigError) as exc_info:
+    with pytest.raises(ConfigurationError) as exc_info:
         ConfigParser(config)
 
     assert (
@@ -75,7 +76,7 @@ def test_invalid_type_fails_validation():
     )
 
 
-def test_invalid_url_format_fails_validation():
+def test_invalid_url_format_fails_validation() -> None:
     """Test that invalid URLs fail validation."""
     config = {
         "DicomWebOAuth": {
@@ -90,7 +91,7 @@ def test_invalid_url_format_fails_validation():
         }
     }
 
-    with pytest.raises(ConfigError) as exc_info:
+    with pytest.raises(ConfigurationError) as exc_info:
         ConfigParser(config)
 
     assert (

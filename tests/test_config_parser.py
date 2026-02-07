@@ -1,9 +1,12 @@
+from typing import Any, Dict
+
 import pytest
 
-from src.config_parser import ConfigError, ConfigParser
+from src.config_parser import ConfigParser
+from src.error_codes import ConfigurationError
 
 
-def test_parse_basic_server_config():
+def test_parse_basic_server_config() -> None:
     """Test parsing a simple server configuration."""
     config = {
         "DicomWebOAuth": {
@@ -28,7 +31,7 @@ def test_parse_basic_server_config():
     assert servers["test-server"]["ClientId"] == "client123"
 
 
-def test_env_var_substitution(monkeypatch):
+def test_env_var_substitution(monkeypatch: Any) -> None:
     """Test that ${VAR} patterns are replaced with environment variables."""
     monkeypatch.setenv("TEST_CLIENT_ID", "env_client_123")
     monkeypatch.setenv("TEST_SECRET", "env_secret_456")
@@ -54,9 +57,9 @@ def test_env_var_substitution(monkeypatch):
     assert servers["test-server"]["ClientSecret"] == "env_secret_456"
 
 
-def test_missing_env_var_raises_error(monkeypatch):
-    """Test that missing environment variables raise ConfigError."""
-    config = {
+def test_missing_env_var_raises_error(monkeypatch: Any) -> None:
+    """Test that missing environment variables raise ConfigurationError."""
+    config: Dict[str, Any] = {
         "DicomWebOAuth": {
             "Servers": {
                 "test-server": {
@@ -70,22 +73,22 @@ def test_missing_env_var_raises_error(monkeypatch):
         }
     }
 
-    with pytest.raises(ConfigError, match="Environment variable 'MISSING_VAR'"):
+    with pytest.raises(ConfigurationError, match="Environment variable 'MISSING_VAR'"):
         parser = ConfigParser(config)
         parser.get_servers()
 
 
-def test_missing_dicomweb_oauth_section():
+def test_missing_dicomweb_oauth_section() -> None:
     """Test that missing DicomWebOAuth section raises error."""
-    config = {}
+    config: Dict[str, Any] = {}
 
-    with pytest.raises(ConfigError, match="Missing 'DicomWebOAuth' section"):
-        ConfigParser(config)
+    with pytest.raises(ConfigurationError, match="Missing 'DicomWebOAuth' section"):
+        ConfigParser(config, validate_schema=False)
 
 
-def test_missing_servers_section():
+def test_missing_servers_section() -> None:
     """Test that missing Servers section raises error."""
-    config = {"DicomWebOAuth": {}}
+    config: Dict[str, Any] = {"DicomWebOAuth": {}}
 
-    with pytest.raises(ConfigError, match="Missing 'Servers' section"):
+    with pytest.raises(ConfigurationError, match="Missing 'Servers' section"):
         ConfigParser(config)

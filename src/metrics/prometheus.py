@@ -1,6 +1,6 @@
 """Prometheus metrics collection."""
 import threading
-from typing import Optional, cast
+from typing import Optional
 
 from prometheus_client import (
     REGISTRY,
@@ -181,7 +181,8 @@ def get_metrics_text() -> str:
     Returns:
         Metrics as text
     """
-    return cast(bytes, generate_latest(_get_registry())).decode("utf-8")
+    result = generate_latest(_get_registry())
+    return result.decode("utf-8")  # type: ignore[no-any-return]
 
 
 def reset_metrics() -> None:

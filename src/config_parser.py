@@ -17,7 +17,7 @@ class ConfigError(Exception):
 class ConfigParser:
     """Parse and validate plugin configuration from Orthanc JSON config."""
 
-    def __init__(self, config: Dict[str, Any], validate_schema: bool = True):
+    def __init__(self, config: Dict[str, Any], validate_schema: bool = True) -> None:
         """
         Initialize parser with Orthanc configuration.
 
