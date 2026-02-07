@@ -1,10 +1,72 @@
-"""Structured logging for OAuth plugin."""
+"""Structured logging for OAuth plugin with secret redaction."""
 import json
 import logging
+import re
 import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+
+# Secret patterns to redact
+SECRET_PATTERNS = [
+    (
+        re.compile(
+            r"(client_secret|api_key|password|secret|token)([\s=:]+)[\w\-\.]+",
+            re.IGNORECASE,
+        ),
+        r"\1\2***REDACTED***",
+    ),
+    (re.compile(r"Bearer\s+[\w\-\.]+", re.IGNORECASE), "Bearer ***REDACTED***"),
+    (
+        re.compile(r"Authorization:\s*Bearer\s+[\w\-\.]+", re.IGNORECASE),
+        "Authorization: Bearer ***REDACTED***",
+    ),
+]
+
+# Keys to redact in dictionaries
+REDACT_KEYS = {
+    "client_secret",
+    "secret",
+    "password",
+    "api_key",
+    "access_token",
+    "refresh_token",
+    "token",
+    "authorization",
+}
+
+
+def redact_secrets(value: Any) -> Any:
+    """
+    Redact secrets from log values.
+
+    Args:
+        value: Value to redact (string, dict, list, etc.)
+
+    Returns:
+        Value with secrets redacted
+    """
+    if isinstance(value, str):
+        # Apply regex patterns to redact secrets in strings
+        result = value
+        for pattern, replacement in SECRET_PATTERNS:
+            result = pattern.sub(replacement, result)
+        return result
+
+    elif isinstance(value, dict):
+        # Redact dictionary values with sensitive keys
+        return {
+            key: "***REDACTED***" if key.lower() in REDACT_KEYS else redact_secrets(val)
+            for key, val in value.items()
+        }
+
+    elif isinstance(value, (list, tuple)):
+        # Recursively redact list/tuple items
+        return type(value)(redact_secrets(item) for item in value)
+
+    else:
+        # Return non-string types as-is
+        return value
 
 
 class StructuredLogger:
@@ -17,6 +79,8 @@ class StructuredLogger:
     - message
     - context fields (server, operation, etc.)
     - correlation_id (for request tracing)
+
+    Secrets are automatically redacted from all log entries.
     """
 
     def __init__(self, name: str = "oauth-plugin"):
@@ -63,14 +127,18 @@ class StructuredLogger:
         return str(uuid.uuid4())
 
     def _log(self, level: int, message: str, **kwargs):
-        """Internal log method with context."""
+        """Internal log method with context and secret redaction."""
         extra_fields = {**self.context, **kwargs}
 
         # Add correlation ID if set
         if self.correlation_id:
             extra_fields["correlation_id"] = self.correlation_id
 
-        self.logger.log(level, message, extra={"fields": extra_fields})
+        # Redact secrets from message and fields
+        redacted_message = redact_secrets(message)
+        redacted_fields = redact_secrets(extra_fields)
+
+        self.logger.log(level, redacted_message, extra={"fields": redacted_fields})
 
     def debug(self, message: str, **kwargs):
         """Log debug message."""
