@@ -84,13 +84,13 @@ class TokenManager:
 
     def _acquire_token(self) -> str:
         """
-        Acquire a new OAuth2 token via client credentials flow.
+        Acquire a new OAuth2 token via client credentials flow with retry logic.
 
         Returns:
             Access token string
 
         Raises:
-            TokenAcquisitionError: If acquisition fails
+            TokenAcquisitionError: If acquisition fails after all retries
         """
         data = {
             "grant_type": "client_credentials",
@@ -101,32 +101,55 @@ class TokenManager:
         if self.scope:
             data["scope"] = self.scope
 
-        try:
-            response = requests.post(
-                self.token_endpoint,
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                timeout=30
-            )
-            response.raise_for_status()
+        max_retries = 3
+        retry_delay = 1  # seconds
 
-            token_data = response.json()
-            self._cached_token = token_data["access_token"]
-            expires_in = token_data.get("expires_in", 3600)
-            self._token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    self.token_endpoint,
+                    data=data,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    timeout=30
+                )
+                response.raise_for_status()
 
-            logger.info(
-                f"Token acquired for server '{self.server_name}', "
-                f"expires in {expires_in} seconds"
-            )
+                token_data = response.json()
+                self._cached_token = token_data["access_token"]
+                expires_in = token_data.get("expires_in", 3600)
+                self._token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
-            return self._cached_token
+                logger.info(
+                    f"Token acquired for server '{self.server_name}', "
+                    f"expires in {expires_in} seconds"
+                )
 
-        except requests.RequestException as e:
-            error_msg = f"Failed to acquire token for server '{self.server_name}': {e}"
-            logger.error(error_msg)
-            raise TokenAcquisitionError(error_msg) from e
-        except (KeyError, ValueError) as e:
-            error_msg = f"Invalid token response for server '{self.server_name}': {e}"
-            logger.error(error_msg)
-            raise TokenAcquisitionError(error_msg) from e
+                return self._cached_token
+
+            except (requests.Timeout, requests.ConnectionError) as e:
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"Token acquisition attempt {attempt + 1} failed for "
+                        f"server '{self.server_name}': {e}. Retrying in {retry_delay}s..."
+                    )
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+                else:
+                    error_msg = (
+                        f"Failed to acquire token for server '{self.server_name}' "
+                        f"after {max_retries} attempts: {e}"
+                    )
+                    logger.error(error_msg)
+                    raise TokenAcquisitionError(error_msg) from e
+
+            except requests.RequestException as e:
+                # Non-retryable errors (4xx, 5xx)
+                error_msg = f"Failed to acquire token for server '{self.server_name}': {e}"
+                logger.error(error_msg)
+                raise TokenAcquisitionError(error_msg) from e
+
+            except (KeyError, ValueError) as e:
+                error_msg = f"Invalid token response for server '{self.server_name}': {e}"
+                logger.error(error_msg)
+                raise TokenAcquisitionError(error_msg) from e
