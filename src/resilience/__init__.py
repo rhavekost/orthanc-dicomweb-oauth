@@ -4,5 +4,23 @@ from src.resilience.circuit_breaker import (
     CircuitBreakerError,
     CircuitBreakerState,
 )
+from src.resilience.retry_strategy import (
+    ExponentialBackoff,
+    FixedBackoff,
+    LinearBackoff,
+    RetryConfig,
+    RetryExhaustedError,
+    RetryStrategy,
+)
 
-__all__ = ["CircuitBreaker", "CircuitBreakerState", "CircuitBreakerError"]
+__all__ = [
+    "CircuitBreaker",
+    "CircuitBreakerState",
+    "CircuitBreakerError",
+    "RetryStrategy",
+    "RetryConfig",
+    "ExponentialBackoff",
+    "LinearBackoff",
+    "FixedBackoff",
+    "RetryExhaustedError",
+]
