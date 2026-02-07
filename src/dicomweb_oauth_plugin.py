@@ -19,6 +19,7 @@ except ImportError:
     orthanc = None
 
 from src.config_parser import ConfigError, ConfigParser
+from src.metrics import get_metrics_text
 from src.plugin_context import PluginContext
 from src.token_manager import TokenAcquisitionError, TokenManager
 
@@ -320,6 +321,26 @@ def handle_rest_api_test_server(output: Any, uri: str, **_request: Any) -> None:
         )
 
 
+def metrics_endpoint(output: Any, uri: str, **_request: Any) -> None:
+    """
+    REST API endpoint: Prometheus metrics.
+
+    Returns metrics in Prometheus text format for monitoring.
+
+    GET /dicomweb-oauth/metrics
+
+    Response:
+        Prometheus text format (Content-Type: text/plain; version=0.0.4)
+    """
+    try:
+        metrics_text = get_metrics_text()
+        output.AnswerBuffer(metrics_text, "text/plain; version=0.0.4")
+    except Exception as e:
+        logger.error(f"Failed to generate metrics: {e}")
+        error_message = f"Error generating metrics: {e}"
+        output.AnswerBuffer(error_message, "text/plain", status=500)
+
+
 # Orthanc plugin entry point
 def OnChange(_changeType: int, level: int, _resource: str) -> None:
     """Orthanc change callback (not used, but required by plugin API)."""
@@ -347,8 +368,12 @@ if _ORTHANC_AVAILABLE and orthanc is not None:
         orthanc.RegisterRestCallback(
             "/dicomweb-oauth/servers/(.*)/test", handle_rest_api_test_server
         )
+        orthanc.RegisterRestCallback("/dicomweb-oauth/metrics", metrics_endpoint)
 
-        logger.info("DICOMweb OAuth plugin registered successfully")
+        logger.info(
+            "DICOMweb OAuth plugin registered successfully "
+            "(including /dicomweb-oauth/metrics)"
+        )
     except Exception as e:
         logger.error(f"Failed to register plugin: {e}")
         raise
