@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "orthanc-oauth.fullname" . }}
+  labels:
+    {{- include "orthanc-oauth.labels" . | nindent 4 }}
+data:
+  orthanc.json: |
+    {
+      "Name": "{{ .Values.orthanc.name }}",
+      "RemoteAccessEnabled": {{ .Values.orthanc.remoteAccessEnabled }},
+      "AuthenticationEnabled": {{ .Values.orthanc.authenticationEnabled }},
+      "Plugins": ["/path/to/dicomweb_oauth_plugin.py"],
+      "DicomWeb": {
+        "Enable": true,
+        "Root": "/dicom-web/",
+        "EnableWado": true,
+        "WadoRoot": "/wado",
+        "OAuth": {
+          "Enabled": {{ .Values.oauth.enabled }},
+          "ClientId": "{{ .Values.oauth.clientId }}",
+          "TokenEndpoint": "{{ .Values.oauth.tokenEndpoint }}",
+          "Scope": "{{ .Values.oauth.scope }}",
+          "CacheBackend": "{{ .Values.oauth.cacheBackend }}",
+          {{- if .Values.redis.enabled }}
+          "Redis": {
+            "Host": "{{ .Values.redis.host }}",
+            "Port": {{ .Values.redis.port }},
+            "DB": {{ .Values.redis.db }},
+            "Prefix": "{{ .Values.redis.prefix }}"
+          },
+          {{- end }}
+          "Servers": []
+        }
+      }
+    }

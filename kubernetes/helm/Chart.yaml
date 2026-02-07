@@ -1,0 +1,18 @@
+apiVersion: v2
+name: orthanc-oauth
+description: Orthanc DICOM server with OAuth2 DICOMweb plugin
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+keywords:
+  - orthanc
+  - dicom
+  - oauth2
+  - medical-imaging
+  - healthcare
+home: https://github.com/rhavekost/orthanc-dicomweb-oauth
+sources:
+  - https://github.com/rhavekost/orthanc-dicomweb-oauth
+maintainers:
+  - name: rhavekost
+    email: rhavekost@users.noreply.github.com

@@ -1,0 +1,173 @@
+# Default values for orthanc-oauth
+
+replicaCount: 2
+
+image:
+  repository: orthanc-oauth
+  pullPolicy: IfNotPresent
+  tag: "2.0.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8042"
+  prometheus.io/path: "/plugins/oauth/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 8042
+  targetPort: 8042
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: orthanc.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: orthanc-tls
+      hosts:
+        - orthanc.example.com
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "250m"
+  limits:
+    memory: "2Gi"
+    cpu: "1000m"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /app/explorer.html
+    port: 8042
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /plugins/oauth/status
+    port: 8042
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /app/explorer.html
+    port: 8042
+  initialDelaySeconds: 0
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - orthanc-oauth
+          topologyKey: kubernetes.io/hostname
+
+# Orthanc configuration
+orthanc:
+  name: "Orthanc OAuth"
+  remoteAccessEnabled: true
+  authenticationEnabled: false  # OAuth provides authentication
+
+# OAuth configuration
+oauth:
+  enabled: true
+  clientId: ""  # Set via --set or override
+  clientSecret: ""  # Set via --set or override
+  tokenEndpoint: ""
+  scope: "https://dicom.healthcareapis.azure.com/.default"
+  cacheBackend: "redis"
+
+# Redis configuration
+redis:
+  enabled: true
+  host: "redis-master"
+  port: 6379
+  db: 0
+  password: ""
+  prefix: "orthanc:oauth:"
+
+  # Deploy Redis as part of this chart
+  deploy: true
+
+  # If deploy: true, configure Redis
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+# Persistence for Orthanc database
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 100Gi
+
+# Monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    namespace: monitoring
+    interval: 30s

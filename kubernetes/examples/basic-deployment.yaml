@@ -1,0 +1,107 @@
+# Basic Orthanc OAuth deployment example
+# For production, use the Helm chart instead
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orthanc
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: orthanc-oauth-secrets
+  namespace: orthanc
+type: Opaque
+stringData:
+  oauth-client-secret: "your-client-secret-here"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orthanc-config
+  namespace: orthanc
+data:
+  orthanc.json: |
+    {
+      "Name": "Orthanc OAuth",
+      "RemoteAccessEnabled": true,
+      "AuthenticationEnabled": false,
+      "Plugins": ["/path/to/dicomweb_oauth_plugin.py"],
+      "DicomWeb": {
+        "Enable": true,
+        "Root": "/dicom-web/",
+        "OAuth": {
+          "Enabled": true,
+          "ClientId": "your-client-id",
+          "TokenEndpoint": "https://login.microsoftonline.com/tenant-id/oauth2/v2.0/token",
+          "Scope": "https://dicom.healthcareapis.azure.com/.default",
+          "CacheBackend": "memory"
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orthanc-oauth
+  namespace: orthanc
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orthanc-oauth
+  template:
+    metadata:
+      labels:
+        app: orthanc-oauth
+    spec:
+      containers:
+      - name: orthanc
+        image: orthanc-oauth:2.0.0
+        ports:
+        - containerPort: 8042
+        env:
+        - name: OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: orthanc-oauth-secrets
+              key: oauth-client-secret
+        volumeMounts:
+        - name: config
+          mountPath: /etc/orthanc/orthanc.json
+          subPath: orthanc.json
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /app/explorer.html
+            port: 8042
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /plugins/oauth/status
+            port: 8042
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: orthanc-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orthanc-oauth
+  namespace: orthanc
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8042
+    targetPort: 8042
+  selector:
+    app: orthanc-oauth
