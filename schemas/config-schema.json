@@ -72,6 +72,56 @@
           "enum": ["auto", "azure", "google", "keycloak", "generic"],
           "default": "auto",
           "description": "OAuth provider type"
+        },
+        "ResilienceConfig": {
+          "type": "object",
+          "properties": {
+            "CircuitBreakerEnabled": {
+              "type": "boolean",
+              "description": "Enable circuit breaker pattern for resilience"
+            },
+            "CircuitBreakerFailureThreshold": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of failures before circuit opens"
+            },
+            "CircuitBreakerTimeout": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Time in seconds before circuit tries to close"
+            },
+            "RetryMaxAttempts": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum number of retry attempts"
+            },
+            "RetryStrategy": {
+              "type": "string",
+              "enum": ["fixed", "linear", "exponential"],
+              "description": "Retry backoff strategy"
+            },
+            "RetryInitialDelay": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Initial delay in seconds for retry"
+            },
+            "RetryMultiplier": {
+              "type": "number",
+              "minimum": 1,
+              "description": "Multiplier for exponential backoff"
+            },
+            "RetryMaxDelay": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Maximum delay in seconds for retry"
+            },
+            "RetryIncrement": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Increment in seconds for linear backoff"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

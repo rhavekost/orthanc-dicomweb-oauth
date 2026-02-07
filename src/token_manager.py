@@ -3,12 +3,20 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import requests
 
 from src.oauth_providers.base import OAuthProvider, TokenAcquisitionError
 from src.oauth_providers.factory import OAuthProviderFactory
+from src.resilience.circuit_breaker import CircuitBreaker
+from src.resilience.retry_strategy import (
+    ExponentialBackoff,
+    FixedBackoff,
+    LinearBackoff,
+    RetryConfig,
+    RetryStrategy,
+)
 from src.structured_logger import structured_logger
 
 logger = logging.getLogger(__name__)
@@ -35,7 +43,7 @@ DEFAULT_REFRESH_BUFFER_SECONDS = 300
 class TokenManager:
     """Manages OAuth2 token acquisition, caching, and refresh for a DICOMweb server."""
 
-    def __init__(self, server_name: str, config: Dict[str, Any]):
+    def __init__(self, server_name: str, config: Dict[str, Any]) -> None:
         """
         Initialize token manager for a DICOMweb server.
 
@@ -71,6 +79,10 @@ class TokenManager:
             provider_type=provider_type, config=config
         )
 
+        # Initialize resilience features
+        self._circuit_breaker = self._create_circuit_breaker(config)
+        self._retry_config = self._create_retry_config(config)
+
         structured_logger.info(
             "Token manager initialized",
             server=server_name,
@@ -87,6 +99,65 @@ class TokenManager:
                 f"Server '{self.server_name}' missing required config keys: "
                 f"{missing_keys}"
             )
+
+    def _create_circuit_breaker(
+        self, config: Dict[str, Any]
+    ) -> Optional[CircuitBreaker]:
+        """Create circuit breaker from config."""
+        resilience_config = config.get("ResilienceConfig", {})
+
+        if not resilience_config.get("CircuitBreakerEnabled", False):
+            return None
+
+        return CircuitBreaker(
+            failure_threshold=resilience_config.get(
+                "CircuitBreakerFailureThreshold", 5
+            ),
+            timeout=resilience_config.get("CircuitBreakerTimeout", 60.0),
+            exception_filter=lambda e: isinstance(
+                e, (requests.Timeout, requests.ConnectionError, TokenAcquisitionError)
+            ),
+        )
+
+    def _create_retry_config(self, config: Dict[str, Any]) -> Optional[RetryConfig]:
+        """Create retry config from config."""
+        resilience_config = config.get("ResilienceConfig", {})
+
+        max_attempts = resilience_config.get("RetryMaxAttempts")
+        if max_attempts is None:
+            return None
+
+        # Create strategy based on config
+        strategy_type = resilience_config.get("RetryStrategy", "exponential")
+        initial_delay = resilience_config.get("RetryInitialDelay", 1.0)
+
+        strategy: RetryStrategy
+        if strategy_type == "fixed":
+            strategy = FixedBackoff(delay=initial_delay)
+        elif strategy_type == "linear":
+            increment = resilience_config.get("RetryIncrement", 1.0)
+            strategy = LinearBackoff(initial_delay=initial_delay, increment=increment)
+        else:  # exponential
+            multiplier = resilience_config.get("RetryMultiplier", 2.0)
+            max_delay = resilience_config.get("RetryMaxDelay")
+            strategy = ExponentialBackoff(
+                initial_delay=initial_delay,
+                multiplier=multiplier,
+                max_delay=max_delay,
+            )
+
+        return RetryConfig(
+            max_attempts=max_attempts,
+            strategy=strategy,
+            should_retry=lambda e: not isinstance(e, TokenAcquisitionError),
+            on_retry=lambda attempt, exc: structured_logger.warning(
+                "Token acquisition retry",
+                server=self.server_name,
+                attempt=attempt + 1,
+                max_attempts=max_attempts,
+                error=str(exc),
+            ),
+        )
 
     def get_token(self) -> str:
         """
@@ -149,6 +220,67 @@ class TokenManager:
             endpoint=self.token_endpoint,
         )
 
+        def acquire_operation() -> str:
+            """Core token acquisition logic."""
+            # Use configured retry or fall back to legacy retry
+            if self._retry_config:
+                return self._acquire_with_retry_config()
+            else:
+                return self._acquire_with_legacy_retry()
+
+        # Apply circuit breaker if enabled
+        if self._circuit_breaker:
+            return cast(str, self._circuit_breaker.call(acquire_operation))
+        else:
+            return acquire_operation()
+
+    def _acquire_with_retry_config(self) -> str:
+        """Acquire token using configured retry strategy."""
+        assert self._retry_config is not None
+
+        def attempt_acquire() -> str:
+            oauth_token = self.provider.acquire_token()
+
+            self._cached_token = oauth_token.access_token
+            self._token_expiry = datetime.now(timezone.utc) + timedelta(
+                seconds=oauth_token.expires_in
+            )
+
+            # Validate token if provider supports it
+            if not self.provider.validate_token(oauth_token.access_token):
+                raise TokenAcquisitionError("Token validation failed")
+
+            structured_logger.info(
+                "Token acquired and validated",
+                server=self.server_name,
+                operation="acquire_token",
+                provider=self.provider.provider_name,
+                expires_in_seconds=oauth_token.expires_in,
+            )
+            logger.info(
+                f"Token acquired for server '{self.server_name}', "
+                f"expires in {oauth_token.expires_in} seconds"
+            )
+
+            return self._cached_token
+
+        try:
+            return cast(str, self._retry_config.execute(attempt_acquire))
+        except Exception as e:
+            error_msg = f"Failed to acquire token for server '{self.server_name}': {e}"
+            structured_logger.error(
+                "Token acquisition failed",
+                server=self.server_name,
+                operation="acquire_token",
+                provider=self.provider.provider_name,
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
+            logger.error(error_msg)
+            raise TokenAcquisitionError(error_msg) from e
+
+    def _acquire_with_legacy_retry(self) -> str:
+        """Legacy token acquisition with hardcoded exponential backoff."""
         max_retries = MAX_TOKEN_ACQUISITION_RETRIES
         retry_delay = INITIAL_RETRY_DELAY_SECONDS
 
