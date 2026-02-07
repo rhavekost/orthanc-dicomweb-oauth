@@ -1,6 +1,7 @@
 """OAuth provider factory."""
 from typing import Any, Dict, Type
 
+from src.oauth_providers.aws import AWSProvider
 from src.oauth_providers.azure import AzureOAuthProvider
 from src.oauth_providers.base import OAuthConfig, OAuthProvider
 from src.oauth_providers.generic import GenericOAuth2Provider
@@ -19,6 +20,7 @@ class OAuthProviderFactory:
         "generic": GenericOAuth2Provider,
         "azure": AzureOAuthProvider,
         "google": GoogleProvider,
+        "aws": AWSProvider,
         # Add more providers here as implemented:
         # "keycloak": KeycloakOAuthProvider,
     }
@@ -89,6 +91,10 @@ class OAuthProviderFactory:
         # Google detection
         if "oauth2.googleapis.com" in token_endpoint:
             return "google"
+
+        # AWS detection
+        if "amazonaws.com" in token_endpoint or "aws" in token_endpoint.lower():
+            return "aws"
 
         # Keycloak detection
         if "/auth/realms/" in token_endpoint:
