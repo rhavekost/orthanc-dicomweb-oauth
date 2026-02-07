@@ -249,9 +249,9 @@ def handle_rest_api_servers(output: Any, uri: str, **_request: Any) -> None:
                 "name": server_name,
                 "url": context.get_server_url(server_name),
                 "token_endpoint": token_manager.token_endpoint,
-                "has_cached_token": token_manager._cached_token is not None,
+                "has_cached_token": token_manager._encrypted_cached_token is not None,
                 "token_valid": token_manager._is_token_valid()
-                if token_manager._cached_token
+                if token_manager._encrypted_cached_token
                 else False,
             }
             servers.append(server_info)

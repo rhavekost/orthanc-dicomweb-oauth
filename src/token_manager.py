@@ -19,6 +19,7 @@ from src.resilience.retry_strategy import (
     RetryConfig,
     RetryStrategy,
 )
+from src.secrets_manager import SecretsManager
 from src.structured_logger import structured_logger
 
 logger = logging.getLogger(__name__)
@@ -57,15 +58,23 @@ class TokenManager:
         self.config = config
         self._validate_config()
 
-        # Token cache
-        self._cached_token: Optional[str] = None
+        # Initialize secrets manager for encryption
+        self._secrets_manager = SecretsManager()
+
+        # Token cache (encrypted)
+        self._encrypted_cached_token: Optional[bytes] = None
         self._token_expiry: Optional[datetime] = None
         self._lock = threading.Lock()
 
         # Configuration
         self.token_endpoint = config["TokenEndpoint"]
         self.client_id = config["ClientId"]
-        self.client_secret = config["ClientSecret"]
+
+        # Encrypt client secret in memory
+        self._encrypted_client_secret = self._secrets_manager.encrypt_secret(
+            config["ClientSecret"]
+        )
+
         self.scope = config.get("Scope", "")
         self.refresh_buffer_seconds = config.get(
             "TokenRefreshBufferSeconds", DEFAULT_REFRESH_BUFFER_SECONDS
@@ -78,7 +87,11 @@ class TokenManager:
             provider_type = OAuthProviderFactory.auto_detect(config)
 
         self.provider: OAuthProvider = OAuthProviderFactory.create(
-            provider_type=provider_type, config=config
+            provider_type=provider_type,
+            config={
+                **config,
+                "ClientSecret": self._get_client_secret(),  # Decrypt only when needed
+            },
         )
 
         # Initialize resilience features
@@ -86,10 +99,39 @@ class TokenManager:
         self._retry_config = self._create_retry_config(config)
 
         structured_logger.info(
-            "Token manager initialized",
+            "Token manager initialized with encrypted secrets",
             server=server_name,
             provider=self.provider.provider_name,
         )
+
+    def _get_client_secret(self) -> str:
+        """
+        Decrypt and return client secret.
+
+        Returns:
+            Decrypted client secret
+        """
+        return self._secrets_manager.decrypt_secret(self._encrypted_client_secret)
+
+    def _set_cached_token(self, token: str) -> None:
+        """
+        Encrypt and cache access token.
+
+        Args:
+            token: Access token to cache
+        """
+        self._encrypted_cached_token = self._secrets_manager.encrypt_secret(token)
+
+    def _get_cached_token(self) -> Optional[str]:
+        """
+        Decrypt and return cached token.
+
+        Returns:
+            Decrypted token or None if no token cached
+        """
+        if self._encrypted_cached_token is None:
+            return None
+        return self._secrets_manager.decrypt_secret(self._encrypted_cached_token)
 
     def _validate_config(self) -> None:
         """Validate that required configuration keys are present."""
@@ -186,8 +228,10 @@ class TokenManager:
                     cached=True,
                 )
                 logger.debug(f"Using cached token for server '{self.server_name}'")
-                assert self._cached_token is not None  # Validated by _is_token_valid
-                return self._cached_token
+
+                cached_token = self._get_cached_token()
+                assert cached_token is not None  # Validated by _is_token_valid
+                return cached_token
 
             # Record cache miss
             metrics.record_cache_miss(self.server_name)
@@ -204,7 +248,7 @@ class TokenManager:
 
     def _is_token_valid(self) -> bool:
         """Check if cached token exists and is not expiring soon."""
-        if self._cached_token is None or self._token_expiry is None:
+        if self._encrypted_cached_token is None or self._token_expiry is None:
             return False
 
         # Token is valid if it won't expire within the buffer window
@@ -270,7 +314,8 @@ class TokenManager:
         def attempt_acquire() -> str:
             oauth_token = self.provider.acquire_token()
 
-            self._cached_token = oauth_token.access_token
+            # Cache encrypted token
+            self._set_cached_token(oauth_token.access_token)
             self._token_expiry = datetime.now(timezone.utc) + timedelta(
                 seconds=oauth_token.expires_in
             )
@@ -298,7 +343,9 @@ class TokenManager:
                 f"expires in {oauth_token.expires_in} seconds"
             )
 
-            return self._cached_token
+            cached_token = self._get_cached_token()
+            assert cached_token is not None
+            return cached_token
 
         try:
             return cast(str, self._retry_config.execute(attempt_acquire))
@@ -336,7 +383,8 @@ class TokenManager:
                 # Use provider to acquire token
                 oauth_token = self.provider.acquire_token()
 
-                self._cached_token = oauth_token.access_token
+                # Cache encrypted token
+                self._set_cached_token(oauth_token.access_token)
                 self._token_expiry = datetime.now(timezone.utc) + timedelta(
                     seconds=oauth_token.expires_in
                 )
@@ -366,7 +414,9 @@ class TokenManager:
                     f"expires in {oauth_token.expires_in} seconds"
                 )
 
-                return self._cached_token
+                cached_token = self._get_cached_token()
+                assert cached_token is not None
+                return cached_token
 
             except (requests.Timeout, requests.ConnectionError, NetworkError) as e:
                 if attempt < max_retries - 1:
