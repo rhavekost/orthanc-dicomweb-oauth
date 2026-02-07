@@ -1,0 +1,15 @@
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "google-healthcare": {
+        "DicomWebRoot": "https://healthcare.googleapis.com/v1/projects/{project}/locations/{location}/datasets/{dataset}/dicomStores/{dicomstore}/dicomWeb",
+        "ProviderType": "google",
+        "TokenEndpoint": "https://oauth2.googleapis.com/token",
+        "ClientId": "${GOOGLE_CLIENT_ID}",
+        "ClientSecret": "${GOOGLE_CLIENT_SECRET}",
+        "Scope": "https://www.googleapis.com/auth/cloud-healthcare",
+        "RefreshBufferSeconds": 300
+      }
+    }
+  }
+}
