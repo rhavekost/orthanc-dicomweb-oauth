@@ -193,6 +193,23 @@ Security events are automatically logged:
 - [Configuration Reference](docs/configuration-reference.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
+## Documentation
+
+### Core Documentation
+- **[Provider Support](docs/PROVIDER-SUPPORT.md)** - Comprehensive guide to all supported OAuth2 providers (Azure, Google, AWS, Keycloak, Auth0, Okta, custom)
+- **[OAuth Flows Guide](docs/OAUTH-FLOWS.md)** - Understanding OAuth2 flows and why only client credentials is supported
+- **[Missing Features](docs/MISSING-FEATURES.md)** - Intentionally excluded features and why (prevents repeated requests)
+
+### Operations
+- **[Backup & Recovery](docs/operations/BACKUP-RECOVERY.md)** - Complete backup/recovery guide for Docker Compose and Kubernetes deployments
+- **[Maintainability](docs/MAINTAINABILITY.md)** - Code quality metrics, complexity tracking, and refactoring guidelines
+
+### Development
+- **[Coding Standards](docs/CODING-STANDARDS.md)** - Complete coding standards and quality guidelines
+- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute, including CLA information
+- **[Refactoring Guide](docs/development/REFACTORING-GUIDE.md)** - Safe refactoring practices
+- **[Code Review Checklist](docs/development/CODE-REVIEW-CHECKLIST.md)** - Consistent code review standards
+
 ## Monitoring & Testing
 
 ### REST API Endpoints
