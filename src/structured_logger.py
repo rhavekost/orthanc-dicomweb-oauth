@@ -2,8 +2,9 @@
 import json
 import logging
 import sys
+import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class StructuredLogger:
@@ -21,6 +22,7 @@ class StructuredLogger:
     def __init__(self, name: str = "oauth-plugin"):
         self.logger = logging.getLogger(name)
         self.context: Dict[str, Any] = {}
+        self.correlation_id: Optional[str] = None
         self._setup_handler()
 
     def _setup_handler(self):
@@ -38,9 +40,36 @@ class StructuredLogger:
         """Clear all context fields."""
         self.context.clear()
 
+    def set_correlation_id(self, correlation_id: str):
+        """
+        Set correlation ID for request tracking.
+
+        Args:
+            correlation_id: Unique identifier for request tracing
+        """
+        self.correlation_id = correlation_id
+
+    def clear_correlation_id(self):
+        """Clear correlation ID."""
+        self.correlation_id = None
+
+    def generate_correlation_id(self) -> str:
+        """
+        Generate a new correlation ID.
+
+        Returns:
+            UUID4 string
+        """
+        return str(uuid.uuid4())
+
     def _log(self, level: int, message: str, **kwargs):
         """Internal log method with context."""
         extra_fields = {**self.context, **kwargs}
+
+        # Add correlation ID if set
+        if self.correlation_id:
+            extra_fields["correlation_id"] = self.correlation_id
+
         self.logger.log(level, message, extra={"fields": extra_fields})
 
     def debug(self, message: str, **kwargs):
