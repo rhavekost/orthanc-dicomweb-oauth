@@ -13,9 +13,9 @@ class HttpResponse:
     status_code: int
     json_data: Optional[Dict[str, Any]] = None
     text: str = ""
-    headers: Dict[str, str] = None
+    headers: Optional[Dict[str, str]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.headers is None:
             self.headers = {}
 

@@ -33,7 +33,9 @@ class PluginContext:
                 return server_name
         return None
 
-    def register_token_manager(self, server_name: str, manager: TokenManager, url: str):
+    def register_token_manager(
+        self, server_name: str, manager: TokenManager, url: str
+    ) -> None:
         """Register a token manager for a server."""
         self.token_managers[server_name] = manager
         self.server_urls[server_name] = url

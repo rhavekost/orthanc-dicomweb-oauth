@@ -13,6 +13,17 @@ from src.structured_logger import structured_logger
 
 logger = logging.getLogger(__name__)
 
+# Explicitly export public API
+__all__ = [
+    "TokenManager",
+    "TokenAcquisitionError",
+    "MAX_TOKEN_ACQUISITION_RETRIES",
+    "INITIAL_RETRY_DELAY_SECONDS",
+    "TOKEN_REQUEST_TIMEOUT_SECONDS",
+    "DEFAULT_TOKEN_EXPIRY_SECONDS",
+    "DEFAULT_REFRESH_BUFFER_SECONDS",
+]
+
 # Token acquisition configuration constants
 MAX_TOKEN_ACQUISITION_RETRIES = 3
 INITIAL_RETRY_DELAY_SECONDS = 1
@@ -97,6 +108,7 @@ class TokenManager:
                     cached=True,
                 )
                 logger.debug(f"Using cached token for server '{self.server_name}'")
+                assert self._cached_token is not None  # Validated by _is_token_valid
                 return self._cached_token
 
             # Need to acquire a new token

@@ -1,7 +1,7 @@
 """Configuration parser for DICOMweb OAuth plugin."""
 import os
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Match
 
 from src.config_migration import migrate_config as migrate_config_version
 from src.config_schema import validate_config
@@ -103,7 +103,7 @@ class ConfigParser:
         """
         pattern = r"\$\{([^}]+)\}"
 
-        def replace_var(match):
+        def replace_var(match: Match[str]) -> str:
             var_name = match.group(1)
             if var_name not in os.environ:
                 raise ConfigError(

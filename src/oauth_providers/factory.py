@@ -57,12 +57,14 @@ class OAuthProviderFactory:
 
         if provider_type == "azure":
             tenant_id = config.get("TenantId", "common")
-            return provider_class(oauth_config, tenant_id)  # type: ignore[call-arg]
+            return provider_class(oauth_config, tenant_id)
         else:
             return provider_class(oauth_config)
 
     @classmethod
-    def register_provider(cls, provider_type: str, provider_class: Type[OAuthProvider]):
+    def register_provider(
+        cls, provider_type: str, provider_class: Type[OAuthProvider]
+    ) -> None:
         """Register a custom provider type."""
         cls._providers[provider_type] = provider_class
 

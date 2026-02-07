@@ -108,7 +108,7 @@ class StructuredLogger:
 
     def _setup_handler(
         self, log_file: Optional[str], max_bytes: int, backup_count: int
-    ):
+    ) -> None:
         """Setup JSON formatter and handler(s)."""
         formatter = JsonFormatter()
 
@@ -134,15 +134,15 @@ class StructuredLogger:
 
         self.logger.setLevel(logging.INFO)
 
-    def set_context(self, **kwargs):
+    def set_context(self, **kwargs: Any) -> None:
         """Set context fields to include in all log entries."""
         self.context.update(kwargs)
 
-    def clear_context(self):
+    def clear_context(self) -> None:
         """Clear all context fields."""
         self.context.clear()
 
-    def set_correlation_id(self, correlation_id: str):
+    def set_correlation_id(self, correlation_id: str) -> None:
         """
         Set correlation ID for request tracking.
 
@@ -151,7 +151,7 @@ class StructuredLogger:
         """
         self.correlation_id = correlation_id
 
-    def clear_correlation_id(self):
+    def clear_correlation_id(self) -> None:
         """Clear correlation ID."""
         self.correlation_id = None
 
@@ -164,7 +164,7 @@ class StructuredLogger:
         """
         return str(uuid.uuid4())
 
-    def _log(self, level: int, message: str, **kwargs):
+    def _log(self, level: int, message: str, **kwargs: Any) -> None:
         """Internal log method with context and secret redaction."""
         extra_fields = {**self.context, **kwargs}
 
@@ -178,23 +178,23 @@ class StructuredLogger:
 
         self.logger.log(level, redacted_message, extra={"fields": redacted_fields})
 
-    def debug(self, message: str, **kwargs):
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log debug message."""
         self._log(logging.DEBUG, message, **kwargs)
 
-    def info(self, message: str, **kwargs):
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log info message."""
         self._log(logging.INFO, message, **kwargs)
 
-    def warning(self, message: str, **kwargs):
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log warning message."""
         self._log(logging.WARNING, message, **kwargs)
 
-    def error(self, message: str, **kwargs):
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log error message."""
         self._log(logging.ERROR, message, **kwargs)
 
-    def critical(self, message: str, **kwargs):
+    def critical(self, message: str, **kwargs: Any) -> None:
         """Log critical message."""
         self._log(logging.CRITICAL, message, **kwargs)
 

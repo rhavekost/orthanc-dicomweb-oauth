@@ -107,7 +107,7 @@ def on_outgoing_http_request(
     headers: Dict[str, str],
     get_params: Dict[str, str],
     body: bytes,
-) -> Optional[Dict]:
+) -> Optional[Dict[str, Any]]:
     """
     Orthanc HTTP filter callback - injects OAuth2 bearer tokens.
 
