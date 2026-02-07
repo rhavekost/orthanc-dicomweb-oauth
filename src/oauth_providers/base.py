@@ -1,7 +1,10 @@
 """Base OAuth provider interface."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from src.http_client import HttpClient
 
 
 class TokenAcquisitionError(Exception):
@@ -40,8 +43,25 @@ class OAuthProvider(ABC):
     specific to each OAuth provider (Azure, Google, Keycloak, etc.).
     """
 
-    def __init__(self, config: OAuthConfig):
+    def __init__(self, config: OAuthConfig, http_client: Optional["HttpClient"] = None):
+        """
+        Initialize OAuth provider.
+
+        Args:
+            config: OAuth configuration
+            http_client: Optional HTTP client (defaults to RequestsHttpClient)
+        """
         self.config = config
+        self._http_client = http_client
+
+    @property
+    def http_client(self) -> "HttpClient":
+        """Get HTTP client, creating default if needed."""
+        if self._http_client is None:
+            from src.http_client import RequestsHttpClient
+
+            self._http_client = RequestsHttpClient()
+        return self._http_client
 
     @abstractmethod
     def acquire_token(self) -> OAuthToken:

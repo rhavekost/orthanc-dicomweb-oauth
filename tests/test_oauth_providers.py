@@ -154,3 +154,46 @@ def test_register_custom_provider():
     provider = OAuthProviderFactory.create("custom", config)
     assert isinstance(provider, CustomProvider)
     assert provider.provider_name == "custom"
+
+
+def test_generic_provider_with_mock_http_client():
+    """Test provider with injected mock HTTP client."""
+    from unittest.mock import Mock
+
+    from src.http_client import HttpClient, HttpResponse
+
+    # Create mock HTTP client
+    mock_client = Mock(spec=HttpClient)
+    mock_client.post.return_value = HttpResponse(
+        status_code=200,
+        json_data={
+            "access_token": "test_token",
+            "expires_in": 3600,
+            "token_type": "Bearer",
+        },
+    )
+
+    # Create provider with mock client
+    config = OAuthConfig(
+        token_endpoint="https://login.example.com/token",
+        client_id="test_client",
+        client_secret="test_secret",
+        scope="api",
+    )
+
+    provider = GenericOAuth2Provider(config=config, http_client=mock_client)
+
+    # Acquire token
+    token = provider.acquire_token()
+
+    # Verify mock was called correctly
+    mock_client.post.assert_called_once()
+    call_args = mock_client.post.call_args
+
+    assert call_args.kwargs["url"] == "https://login.example.com/token"
+    assert "grant_type" in call_args.kwargs["data"]
+    assert call_args.kwargs["data"]["grant_type"] == "client_credentials"
+
+    # Verify token returned
+    assert token.access_token == "test_token"
+    assert token.expires_in == 3600

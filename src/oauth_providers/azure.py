@@ -1,9 +1,14 @@
 """Azure Active Directory (Entra ID) OAuth provider."""
+from typing import TYPE_CHECKING, Optional
+
 import jwt
 from jwt import PyJWKClient
 
 from src.oauth_providers.base import OAuthConfig
 from src.oauth_providers.generic import GenericOAuth2Provider
+
+if TYPE_CHECKING:
+    from src.http_client import HttpClient
 
 
 class AzureOAuthProvider(GenericOAuth2Provider):
@@ -16,8 +21,13 @@ class AzureOAuthProvider(GenericOAuth2Provider):
     - Tenant-aware configuration
     """
 
-    def __init__(self, config: OAuthConfig, tenant_id: str):
-        super().__init__(config)
+    def __init__(
+        self,
+        config: OAuthConfig,
+        tenant_id: str,
+        http_client: Optional["HttpClient"] = None,
+    ):
+        super().__init__(config, http_client=http_client)
         self.tenant_id = tenant_id
         self.jwks_uri = (
             f"https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys"

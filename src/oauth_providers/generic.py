@@ -28,16 +28,23 @@ class GenericOAuth2Provider(OAuthProvider):
             data["scope"] = self.config.scope
 
         try:
-            response = requests.post(
-                self.config.token_endpoint,
+            # Use injected HTTP client instead of requests directly
+            response = self.http_client.post(
+                url=self.config.token_endpoint,
                 data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
-                timeout=30,
                 verify=self.config.verify_ssl,
+                timeout=30,
             )
-            response.raise_for_status()
 
-            token_data = response.json()
+            # Parse token from response
+            token_data = response.json_data
+
+            if not token_data or "access_token" not in token_data:
+                raise TokenAcquisitionError(
+                    "Invalid token response: missing access_token"
+                )
+
             return OAuthToken(
                 access_token=token_data["access_token"],
                 expires_in=token_data.get("expires_in", 3600),
@@ -46,14 +53,8 @@ class GenericOAuth2Provider(OAuthProvider):
                 scope=token_data.get("scope"),
             )
 
-        except (requests.Timeout, requests.ConnectionError):
-            # Let timeout/connection errors bubble up for retry logic
-            raise
         except requests.RequestException as e:
-            # Wrap other request exceptions (auth errors, etc.)
             raise TokenAcquisitionError(f"Failed to acquire token: {e}") from e
-        except (KeyError, ValueError) as e:
-            raise TokenAcquisitionError(f"Invalid token response: {e}") from e
 
     def validate_token(self, token: str) -> bool:
         """Generic provider doesn't validate tokens."""
@@ -69,16 +70,23 @@ class GenericOAuth2Provider(OAuthProvider):
         }
 
         try:
-            response = requests.post(
-                self.config.token_endpoint,
+            # Use injected HTTP client instead of requests directly
+            response = self.http_client.post(
+                url=self.config.token_endpoint,
                 data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
-                timeout=30,
                 verify=self.config.verify_ssl,
+                timeout=30,
             )
-            response.raise_for_status()
 
-            token_data = response.json()
+            # Parse token from response
+            token_data = response.json_data
+
+            if not token_data or "access_token" not in token_data:
+                raise TokenAcquisitionError(
+                    "Invalid token response: missing access_token"
+                )
+
             return OAuthToken(
                 access_token=token_data["access_token"],
                 expires_in=token_data.get("expires_in", 3600),
@@ -87,8 +95,5 @@ class GenericOAuth2Provider(OAuthProvider):
                 scope=token_data.get("scope"),
             )
 
-        except (requests.Timeout, requests.ConnectionError):
-            # Let timeout/connection errors bubble up for retry logic
-            raise
         except requests.RequestException as e:
             raise TokenAcquisitionError(f"Failed to refresh token: {e}") from e
