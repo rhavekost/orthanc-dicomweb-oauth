@@ -13,9 +13,9 @@ from typing import Any, Dict, Optional
 try:
     import orthanc
 
-    ORTHANC_AVAILABLE = True
+    _ORTHANC_AVAILABLE = True
 except ImportError:
-    ORTHANC_AVAILABLE = False
+    _ORTHANC_AVAILABLE = False
     orthanc = None
 
 from src.config_parser import ConfigError, ConfigParser
@@ -339,7 +339,7 @@ def OnIncomingHttpRequest(method, uri, ip, username, headers):
 
 
 # Plugin registration - only run when orthanc module is available
-if ORTHANC_AVAILABLE and orthanc is not None:
+if _ORTHANC_AVAILABLE and orthanc is not None:
     try:
         logger.info("Registering DICOMweb OAuth plugin with Orthanc")
         initialize_plugin()

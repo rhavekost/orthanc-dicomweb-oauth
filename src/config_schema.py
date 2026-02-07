@@ -7,9 +7,9 @@ try:
     import jsonschema
     from jsonschema import ValidationError
 
-    JSONSCHEMA_AVAILABLE = True
+    _JSONSCHEMA_AVAILABLE = True
 except ImportError:
-    JSONSCHEMA_AVAILABLE = False
+    _JSONSCHEMA_AVAILABLE = False
     ValidationError = Exception  # Fallback
 
 
@@ -51,7 +51,7 @@ def validate_config(config: Dict[str, Any]) -> None:
         ValidationError: If configuration is invalid
         ImportError: If jsonschema library not installed
     """
-    if not JSONSCHEMA_AVAILABLE:
+    if not _JSONSCHEMA_AVAILABLE:
         raise ImportError(
             "jsonschema library required for validation. "
             "Install with: pip install jsonschema"
