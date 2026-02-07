@@ -3,6 +3,10 @@ import requests
 
 from src.oauth_providers.base import OAuthProvider, OAuthToken, TokenAcquisitionError
 
+# Token configuration constants (shared with token_manager)
+TOKEN_REQUEST_TIMEOUT_SECONDS = 30
+DEFAULT_TOKEN_EXPIRY_SECONDS = 3600
+
 
 class GenericOAuth2Provider(OAuthProvider):
     """
@@ -34,7 +38,7 @@ class GenericOAuth2Provider(OAuthProvider):
                 data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 verify=self.config.verify_ssl,
-                timeout=30,
+                timeout=TOKEN_REQUEST_TIMEOUT_SECONDS,
             )
 
             # Parse token from response
@@ -47,7 +51,7 @@ class GenericOAuth2Provider(OAuthProvider):
 
             return OAuthToken(
                 access_token=token_data["access_token"],
-                expires_in=token_data.get("expires_in", 3600),
+                expires_in=token_data.get("expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS),
                 token_type=token_data.get("token_type", "Bearer"),
                 refresh_token=token_data.get("refresh_token"),
                 scope=token_data.get("scope"),
@@ -76,7 +80,7 @@ class GenericOAuth2Provider(OAuthProvider):
                 data=data,
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 verify=self.config.verify_ssl,
-                timeout=30,
+                timeout=TOKEN_REQUEST_TIMEOUT_SECONDS,
             )
 
             # Parse token from response
@@ -89,7 +93,7 @@ class GenericOAuth2Provider(OAuthProvider):
 
             return OAuthToken(
                 access_token=token_data["access_token"],
-                expires_in=token_data.get("expires_in", 3600),
+                expires_in=token_data.get("expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS),
                 token_type=token_data.get("token_type", "Bearer"),
                 refresh_token=token_data.get("refresh_token", refresh_token),
                 scope=token_data.get("scope"),

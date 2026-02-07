@@ -13,6 +13,13 @@ from src.structured_logger import structured_logger
 
 logger = logging.getLogger(__name__)
 
+# Token acquisition configuration constants
+MAX_TOKEN_ACQUISITION_RETRIES = 3
+INITIAL_RETRY_DELAY_SECONDS = 1
+TOKEN_REQUEST_TIMEOUT_SECONDS = 30
+DEFAULT_TOKEN_EXPIRY_SECONDS = 3600
+DEFAULT_REFRESH_BUFFER_SECONDS = 300
+
 
 class TokenManager:
     """Manages OAuth2 token acquisition, caching, and refresh for a DICOMweb server."""
@@ -39,7 +46,9 @@ class TokenManager:
         self.client_id = config["ClientId"]
         self.client_secret = config["ClientSecret"]
         self.scope = config.get("Scope", "")
-        self.refresh_buffer_seconds = config.get("TokenRefreshBufferSeconds", 300)
+        self.refresh_buffer_seconds = config.get(
+            "TokenRefreshBufferSeconds", DEFAULT_REFRESH_BUFFER_SECONDS
+        )
         self.verify_ssl = config.get("VerifySSL", True)
 
         # Create OAuth provider
@@ -128,8 +137,8 @@ class TokenManager:
             endpoint=self.token_endpoint,
         )
 
-        max_retries = 3
-        retry_delay = 1  # seconds
+        max_retries = MAX_TOKEN_ACQUISITION_RETRIES
+        retry_delay = INITIAL_RETRY_DELAY_SECONDS
 
         for attempt in range(max_retries):
             try:
