@@ -150,17 +150,9 @@ bandit -r src/              # Security checks
 
 ### 5. Commit Changes
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
+## Commit Standards
 
-```bash
-git commit -m "feat: add JWT signature validation"
-git commit -m "fix: correct token expiration calculation"
-git commit -m "docs: update configuration examples"
-git commit -m "test: add integration tests for token refresh"
-git commit -m "security: fix token exposure in logs (CVSS 9.1)"
-```
-
-Commit message format:
+We follow [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
 <type>(<scope>): <subject>
@@ -170,15 +162,37 @@ Commit message format:
 <footer>
 ```
 
-Types:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation
-- `test`: Tests
-- `refactor`: Code refactoring
-- `security`: Security fix
-- `perf`: Performance improvement
-- `chore`: Build/tooling changes
+**Types:** feat, fix, docs, style, refactor, perf, test, chore, ci, security
+
+**Examples:**
+- `feat(token): add JWT signature validation`
+- `fix(config): handle missing optional fields gracefully`
+- `docs: add troubleshooting guide for Azure`
+
+See [Git Workflow Guide](docs/git-workflow.md) for complete details.
+
+### Co-Authorship
+
+When pair programming or using AI assistance, include co-authors:
+
+```
+git commit -m "feat: implement feature
+
+Description here
+
+Co-Authored-By: Developer Name <dev@example.com>
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+```
+
+**Quick Reference:**
+
+```bash
+git commit -m "feat: add JWT signature validation"
+git commit -m "fix: correct token expiration calculation"
+git commit -m "docs: update configuration examples"
+git commit -m "test: add integration tests for token refresh"
+git commit -m "security: fix token exposure in logs (CVSS 9.1)"
+```
 
 ### 6. Push and Create Pull Request
 
