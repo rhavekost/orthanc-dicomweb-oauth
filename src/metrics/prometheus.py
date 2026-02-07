@@ -181,8 +181,8 @@ def get_metrics_text() -> str:
     Returns:
         Metrics as text
     """
-    result = generate_latest(_get_registry())
-    return result.decode("utf-8")  # type: ignore[no-any-return]
+    result: bytes = generate_latest(_get_registry())
+    return result.decode("utf-8")
 
 
 def reset_metrics() -> None:

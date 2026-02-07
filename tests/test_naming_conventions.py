@@ -4,13 +4,16 @@ import pathlib
 from typing import List, Tuple
 
 
-def test_module_level_constants_are_private():
+def test_module_level_constants_are_private() -> None:
     """Module-level constants that are implementation details should be private."""
     src_files = list(pathlib.Path("src").rglob("*.py"))
 
     violations: List[Tuple[str, str, int]] = []
 
     for file_path in src_files:
+        # Skip error_codes.py as all error codes are public API
+        if "error_codes.py" in str(file_path):
+            continue
         with open(file_path) as f:
             tree = ast.parse(f.read())
 
