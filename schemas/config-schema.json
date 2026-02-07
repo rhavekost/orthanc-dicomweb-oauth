@@ -5,6 +5,11 @@
   "type": "object",
   "required": ["DicomWebOAuth"],
   "properties": {
+    "ConfigVersion": {
+      "type": "string",
+      "enum": ["2.0"],
+      "description": "Configuration schema version"
+    },
     "DicomWebOAuth": {
       "type": "object",
       "required": ["Servers"],

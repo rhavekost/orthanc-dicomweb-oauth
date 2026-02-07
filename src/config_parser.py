@@ -3,6 +3,7 @@ import os
 import re
 from typing import Any, Dict
 
+from src.config_migration import migrate_config as migrate_config_version
 from src.config_schema import validate_config
 
 
@@ -23,7 +24,8 @@ class ConfigParser:
             config: Full Orthanc configuration dict
             validate_schema: Whether to validate against JSON Schema (default True)
         """
-        self.config = config
+        # Migrate config to current version
+        self.config = migrate_config_version(config)
         self._validate_config(validate_schema=validate_schema)
 
     def _validate_config(self, validate_schema: bool = True) -> None:
