@@ -66,6 +66,10 @@ class JWTValidator:
             # Validation disabled
             return True
 
+        # Ensure public_key is not None (should be guaranteed by self.enabled check)
+        if self.public_key is None:
+            return False
+
         try:
             # Decode and verify token
             decoded = jwt.decode(
