@@ -20,6 +20,18 @@
           "additionalProperties": {
             "$ref": "#/definitions/ServerConfig"
           }
+        },
+        "RateLimitRequests": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Maximum requests per time window"
+        },
+        "RateLimitWindowSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 60,
+          "description": "Rate limit time window in seconds"
         }
       }
     }
@@ -72,6 +84,33 @@
           "enum": ["auto", "azure", "google", "keycloak", "generic"],
           "default": "auto",
           "description": "OAuth provider type"
+        },
+        "JWTPublicKey": {
+          "type": "string",
+          "description": "Public key in PEM format for JWT signature validation"
+        },
+        "JWTAudience": {
+          "type": "string",
+          "description": "Expected JWT audience claim"
+        },
+        "JWTIssuer": {
+          "type": "string",
+          "description": "Expected JWT issuer claim"
+        },
+        "JWTAlgorithms": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Single JWT signing algorithm"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Allowed JWT signing algorithms"
+            }
+          ]
         },
         "ResilienceConfig": {
           "type": "object",
