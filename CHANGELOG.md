@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Google Cloud Healthcare API OAuth provider** - Specialized provider with automatic token endpoint configuration and scope validation
+- **AWS HealthImaging OAuth provider** - Basic implementation for AWS authentication (full Signature v4 pending)
+- **Provider Support Documentation** (`docs/PROVIDER-SUPPORT.md`) - Comprehensive guide covering Azure, Google, AWS, Keycloak, Auth0, Okta with setup instructions and troubleshooting
+- **OAuth Flows Guide** (`docs/OAUTH-FLOWS.md`) - User-friendly explanation of OAuth2 flows and why only client credentials is supported
+- **Missing Features Documentation** (`docs/MISSING-FEATURES.md`) - Explicitly documents intentionally excluded features to prevent repeated requests
+- **Maintainability Documentation** (`docs/MAINTAINABILITY.md`) - Code quality metrics, complexity tracking, and refactoring guidelines
+- **Backup & Recovery Guide** (`docs/operations/BACKUP-RECOVERY.md`) - Complete backup/recovery procedures for Docker Compose and Kubernetes
+- **Backup Scripts** - Automated backup/restore/verify scripts with GPG encryption and S3 upload support
+- **Contributor License Agreement** (`CLA.md`) - Apache-style individual contributor agreement
+- **Code Review Checklist** (`docs/development/CODE-REVIEW-CHECKLIST.md`) - Consistent code review standards
+- **Refactoring Guide** (`docs/development/REFACTORING-GUIDE.md`) - Safe refactoring practices with complexity thresholds
+- **Complexity Monitoring Workflow** (`.github/workflows/complexity-monitoring.yml`) - Automated complexity regression detection in CI
+
+### Documentation
+- Configuration templates for Google Cloud Healthcare API (`config-templates/google-healthcare-api.json`)
+- Configuration template for AWS HealthImaging (`config-templates/aws-healthimaging.json`)
+- Provider comparison matrix with auto-detection capabilities
+- Provider-specific troubleshooting guides
+- Updated README with comprehensive documentation links
+- CLA section added to CONTRIBUTING.md
+
 ## [2.0.0] - 2026-02-07
 
 ### Added
