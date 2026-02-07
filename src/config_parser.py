@@ -61,6 +61,11 @@ class ConfigParser:
                 processed[key] = self._substitute_env_vars(value)
             else:
                 processed[key] = value
+
+        # SSL/TLS Verification (defaults to True for security)
+        if "VerifySSL" not in processed:
+            processed["VerifySSL"] = True
+
         return processed
 
     def _substitute_env_vars(self, value: str) -> str:

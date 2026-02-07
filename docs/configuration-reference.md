@@ -40,6 +40,7 @@ Each server under `Servers` represents a DICOMweb endpoint that requires OAuth2 
 |-------|------|---------|-------------|
 | `Scope` | string | `""` | OAuth2 scope parameter (space-separated if multiple) |
 | `TokenRefreshBufferSeconds` | integer | `300` | Seconds before expiry to trigger proactive refresh |
+| `VerifySSL` | boolean/string | `true` | SSL/TLS certificate verification (true/false/path) |
 
 ## Configuration Examples
 
@@ -219,6 +220,37 @@ Number of seconds before token expiration to trigger proactive refresh.
 ```json
 "TokenRefreshBufferSeconds": 600  // Refresh 10 minutes before expiry
 ```
+
+### VerifySSL
+
+**Type:** Boolean or String
+**Default:** `true`
+**Required:** No
+
+Controls SSL/TLS certificate verification when connecting to the OAuth token endpoint.
+
+**Options:**
+- `true` (default): Verify SSL certificates using system CA bundle
+- `false`: Disable SSL verification (⚠️ NOT RECOMMENDED for production)
+- `"/path/to/ca-bundle.crt"`: Use custom CA certificate bundle
+
+**Example:**
+```json
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "production-server": {
+        "VerifySSL": true
+      },
+      "dev-server-with-self-signed-cert": {
+        "VerifySSL": "/etc/ssl/certs/company-ca.crt"
+      }
+    }
+  }
+}
+```
+
+**Security Warning:** Disabling SSL verification (`false`) makes connections vulnerable to man-in-the-middle attacks. Only use this for local development with self-signed certificates, and NEVER in production.
 
 ## Multiple Servers
 

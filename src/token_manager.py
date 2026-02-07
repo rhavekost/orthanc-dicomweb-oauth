@@ -41,6 +41,7 @@ class TokenManager:
         self.client_secret = config["ClientSecret"]
         self.scope = config.get("Scope", "")
         self.refresh_buffer_seconds = config.get("TokenRefreshBufferSeconds", 300)
+        self.verify_ssl = config.get("VerifySSL", True)
 
     def _validate_config(self) -> None:
         """Validate that required configuration keys are present."""
@@ -110,7 +111,8 @@ class TokenManager:
                     self.token_endpoint,
                     data=data,
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
-                    timeout=30
+                    timeout=30,
+                    verify=self.verify_ssl  # Explicit SSL verification
                 )
                 response.raise_for_status()
 

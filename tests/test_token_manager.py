@@ -145,3 +145,88 @@ def test_token_acquisition_failure():
 
     with pytest.raises(TokenAcquisitionError, match="Failed to acquire token"):
         manager.get_token()
+
+
+def test_ssl_verification_enabled_by_default():
+    """Test that SSL verification is enabled by default."""
+    import unittest.mock as mock
+
+    config = {
+        "TokenEndpoint": "https://login.example.com/oauth2/token",
+        "ClientId": "client123",
+        "ClientSecret": "secret456",
+        "Scope": "scope"
+    }
+
+    manager = TokenManager("test-server", config)
+
+    with mock.patch("requests.post") as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {
+            "access_token": "test_token",
+            "expires_in": 3600
+        }
+
+        manager._acquire_token()
+
+        # Verify SSL verification was enabled
+        call_kwargs = mock_post.call_args[1]
+        assert "verify" in call_kwargs
+        assert call_kwargs["verify"] is True
+
+
+def test_ssl_verification_can_be_disabled_explicitly():
+    """Test that SSL verification can be disabled if explicitly configured."""
+    import unittest.mock as mock
+
+    config = {
+        "TokenEndpoint": "https://login.example.com/oauth2/token",
+        "ClientId": "client123",
+        "ClientSecret": "secret456",
+        "Scope": "scope",
+        "VerifySSL": False
+    }
+
+    manager = TokenManager("test-server", config)
+
+    with mock.patch("requests.post") as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {
+            "access_token": "test_token",
+            "expires_in": 3600
+        }
+
+        manager._acquire_token()
+
+        # Verify SSL verification was disabled
+        call_kwargs = mock_post.call_args[1]
+        assert "verify" in call_kwargs
+        assert call_kwargs["verify"] is False
+
+
+def test_ssl_verification_with_custom_ca_bundle():
+    """Test that custom CA bundle path can be specified."""
+    import unittest.mock as mock
+
+    config = {
+        "TokenEndpoint": "https://login.example.com/oauth2/token",
+        "ClientId": "client123",
+        "ClientSecret": "secret456",
+        "Scope": "scope",
+        "VerifySSL": "/path/to/ca-bundle.crt"
+    }
+
+    manager = TokenManager("test-server", config)
+
+    with mock.patch("requests.post") as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {
+            "access_token": "test_token",
+            "expires_in": 3600
+        }
+
+        manager._acquire_token()
+
+        # Verify custom CA bundle was used
+        call_kwargs = mock_post.call_args[1]
+        assert call_kwargs["verify"] == "/path/to/ca-bundle.crt"
