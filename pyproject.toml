@@ -60,6 +60,36 @@ add-ignore = [
     "D212",  # Multi-line docstring summary can start on first or second line
 ]
 
+[tool.pylint.main]
+py-version = "3.11"
+jobs = 0  # Auto-detect CPU cores
+
+[tool.pylint.messages_control]
+max-line-length = 88
+disable = [
+    "C0103",  # invalid-name (handled by naming conventions)
+    "C0114",  # missing-module-docstring (handled by pydocstyle)
+    "C0115",  # missing-class-docstring (handled by pydocstyle)
+    "C0116",  # missing-function-docstring (handled by pydocstyle)
+    "R0903",  # too-few-public-methods (dataclasses are fine)
+    "W0212",  # protected-access (needed for testing)
+    "R0801",  # duplicate-code (some duplication is acceptable)
+]
+
+[tool.pylint.format]
+max-line-length = 88
+
+[tool.pylint.design]
+max-args = 7
+max-attributes = 10
+max-branches = 12
+max-locals = 15
+max-returns = 6
+max-statements = 50
+
+[tool.pylint.similarities]
+min-similarity-lines = 10
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers"

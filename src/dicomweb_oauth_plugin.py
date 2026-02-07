@@ -192,7 +192,7 @@ def create_api_response(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def handle_rest_api_status(output: Any, uri: str, **request: Any) -> None:
+def handle_rest_api_status(output: Any, uri: str, **_request: Any) -> None:
     """
     REST API endpoint: Plugin status check.
 
@@ -230,7 +230,7 @@ def handle_rest_api_status(output: Any, uri: str, **request: Any) -> None:
         output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
-def handle_rest_api_servers(output: Any, uri: str, **request: Any) -> None:
+def handle_rest_api_servers(output: Any, uri: str, **_request: Any) -> None:
     """
     REST API endpoint: List configured servers.
 
@@ -273,7 +273,7 @@ def handle_rest_api_servers(output: Any, uri: str, **request: Any) -> None:
         output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
-def handle_rest_api_test_server(output: Any, uri: str, **request: Any) -> None:
+def handle_rest_api_test_server(output: Any, uri: str, **_request: Any) -> None:
     """
     POST /dicomweb-oauth/servers/{name}/test.
 
@@ -330,13 +330,13 @@ def handle_rest_api_test_server(output: Any, uri: str, **request: Any) -> None:
 
 
 # Orthanc plugin entry point
-def OnChange(changeType: int, level: int, resource: str) -> None:
+def OnChange(_changeType: int, level: int, _resource: str) -> None:
     """Orthanc change callback (not used, but required by plugin API)."""
     pass
 
 
 def OnIncomingHttpRequest(
-    method: str, uri: str, ip: str, username: str, headers: Dict[str, str]
+    method: str, uri: str, _ip: str, _username: str, headers: Dict[str, str]
 ) -> None:
     """Orthanc incoming HTTP request callback (not used for this plugin)."""
     pass
