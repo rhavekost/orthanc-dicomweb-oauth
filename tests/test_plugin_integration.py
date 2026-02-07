@@ -1,7 +1,8 @@
-import pytest
+from unittest.mock import Mock
+
 import responses
-from unittest.mock import Mock, patch, MagicMock
-from src.dicomweb_oauth_plugin import initialize_plugin, on_outgoing_http_request, _token_managers, _server_urls
+
+from src.dicomweb_oauth_plugin import initialize_plugin, on_outgoing_http_request
 
 
 def test_plugin_initialization():
@@ -15,7 +16,7 @@ def test_plugin_initialization():
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "client123",
                     "ClientSecret": "secret456",
-                    "Scope": "scope"
+                    "Scope": "scope",
                 }
             }
         }
@@ -38,9 +39,9 @@ def test_inject_authorization_header():
         json={
             "access_token": "test_token_123",
             "token_type": "Bearer",
-            "expires_in": 3600
+            "expires_in": 3600,
         },
-        status=200
+        status=200,
     )
 
     # Initialize plugin
@@ -53,7 +54,7 @@ def test_inject_authorization_header():
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "client123",
                     "ClientSecret": "secret456",
-                    "Scope": "scope"
+                    "Scope": "scope",
                 }
             }
         }
@@ -67,7 +68,7 @@ def test_inject_authorization_header():
         method="GET",
         headers=headers,
         get_params={},
-        body=b""
+        body=b"",
     )
 
     # Verify Authorization header was injected
@@ -88,7 +89,7 @@ def test_non_oauth_request_passes_through():
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "client123",
                     "ClientSecret": "secret456",
-                    "Scope": "scope"
+                    "Scope": "scope",
                 }
             }
         }
@@ -102,7 +103,7 @@ def test_non_oauth_request_passes_through():
         method="GET",
         headers=headers,
         get_params={},
-        body=b""
+        body=b"",
     )
 
     # Should return None (pass through)

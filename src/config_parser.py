@@ -1,11 +1,12 @@
 """Configuration parser for DICOMweb OAuth plugin."""
 import os
 import re
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 
 class ConfigError(Exception):
     """Raised when configuration is invalid."""
+
     pass
 
 
@@ -28,7 +29,9 @@ class ConfigParser:
             raise ConfigError("Missing 'DicomWebOAuth' section in configuration")
 
         if "Servers" not in self.config["DicomWebOAuth"]:
-            raise ConfigError("Missing 'Servers' section in DicomWebOAuth configuration")
+            raise ConfigError(
+                "Missing 'Servers' section in DicomWebOAuth configuration"
+            )
 
     def get_servers(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -55,7 +58,7 @@ class ConfigParser:
         Returns:
             Processed configuration with environment variables expanded
         """
-        processed = {}
+        processed: Dict[str, Any] = {}
         for key, value in config.items():
             if isinstance(value, str):
                 processed[key] = self._substitute_env_vars(value)
@@ -81,13 +84,14 @@ class ConfigParser:
         Raises:
             ConfigError: If a referenced environment variable is not set
         """
-        pattern = r'\$\{([^}]+)\}'
+        pattern = r"\$\{([^}]+)\}"
 
         def replace_var(match):
             var_name = match.group(1)
             if var_name not in os.environ:
                 raise ConfigError(
-                    f"Environment variable '{var_name}' referenced in config but not set"
+                    f"Environment variable '{var_name}' referenced in config "
+                    "but not set"
                 )
             return os.environ[var_name]
 

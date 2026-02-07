@@ -1,7 +1,8 @@
 import pytest
 import responses
-from requests.exceptions import Timeout, ConnectionError
-from src.token_manager import TokenManager, TokenAcquisitionError
+from requests.exceptions import Timeout
+
+from src.token_manager import TokenAcquisitionError, TokenManager
 
 
 @responses.activate
@@ -11,26 +12,22 @@ def test_retry_on_timeout():
     responses.add(
         responses.POST,
         "https://login.example.com/oauth2/token",
-        body=Timeout("Connection timeout")
+        body=Timeout("Connection timeout"),
     )
 
     # Second attempt succeeds
     responses.add(
         responses.POST,
         "https://login.example.com/oauth2/token",
-        json={
-            "access_token": "token123",
-            "token_type": "Bearer",
-            "expires_in": 3600
-        },
-        status=200
+        json={"access_token": "token123", "token_type": "Bearer", "expires_in": 3600},
+        status=200,
     )
 
     config = {
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "client123",
         "ClientSecret": "secret456",
-        "Scope": "scope"
+        "Scope": "scope",
     }
 
     manager = TokenManager("test-server", config)
@@ -48,14 +45,14 @@ def test_max_retries_exceeded():
         responses.add(
             responses.POST,
             "https://login.example.com/oauth2/token",
-            body=Timeout("Connection timeout")
+            body=Timeout("Connection timeout"),
         )
 
     config = {
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "client123",
         "ClientSecret": "secret456",
-        "Scope": "scope"
+        "Scope": "scope",
     }
 
     manager = TokenManager("test-server", config)
@@ -73,14 +70,14 @@ def test_no_retry_on_auth_error():
         responses.POST,
         "https://login.example.com/oauth2/token",
         json={"error": "invalid_client"},
-        status=401
+        status=401,
     )
 
     config = {
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "invalid_client",
         "ClientSecret": "wrong_secret",
-        "Scope": "scope"
+        "Scope": "scope",
     }
 
     manager = TokenManager("test-server", config)

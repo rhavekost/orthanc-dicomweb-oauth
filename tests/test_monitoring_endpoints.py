@@ -1,12 +1,13 @@
-import pytest
 import json
+from unittest.mock import Mock
+
 import responses
-from unittest.mock import Mock, patch
+
 from src.dicomweb_oauth_plugin import (
-    initialize_plugin,
-    handle_rest_api_status,
     handle_rest_api_servers,
-    handle_rest_api_test_server
+    handle_rest_api_status,
+    handle_rest_api_test_server,
+    initialize_plugin,
 )
 
 
@@ -21,7 +22,7 @@ def test_status_endpoint():
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "client123",
                     "ClientSecret": "secret456",
-                    "Scope": "scope"
+                    "Scope": "scope",
                 }
             }
         }
@@ -30,7 +31,7 @@ def test_status_endpoint():
 
     # Call status endpoint
     output = Mock()
-    result = handle_rest_api_status(output, None)
+    handle_rest_api_status(output, None)
 
     # Parse response
     response = json.loads(output.AnswerBuffer.call_args[0][0])
@@ -47,12 +48,8 @@ def test_servers_endpoint():
     responses.add(
         responses.POST,
         "https://login.example.com/oauth2/token",
-        json={
-            "access_token": "token123",
-            "token_type": "Bearer",
-            "expires_in": 3600
-        },
-        status=200
+        json={"access_token": "token123", "token_type": "Bearer", "expires_in": 3600},
+        status=200,
     )
 
     mock_orthanc = Mock()
@@ -64,7 +61,7 @@ def test_servers_endpoint():
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "client123",
                     "ClientSecret": "secret456",
-                    "Scope": "scope"
+                    "Scope": "scope",
                 }
             }
         }
@@ -73,11 +70,12 @@ def test_servers_endpoint():
 
     # Acquire token first
     from src.dicomweb_oauth_plugin import _token_managers
+
     _token_managers["test-server"].get_token()
 
     # Call servers endpoint
     output = Mock()
-    result = handle_rest_api_servers(output, None)
+    handle_rest_api_servers(output, None)
 
     # Parse response
     response = json.loads(output.AnswerBuffer.call_args[0][0])
@@ -98,9 +96,9 @@ def test_status_endpoint_no_token_exposure():
         json={
             "access_token": "test_token_12345678901234567890",
             "token_type": "Bearer",
-            "expires_in": 3600
+            "expires_in": 3600,
         },
-        status=200
+        status=200,
     )
 
     mock_orthanc = Mock()
@@ -112,7 +110,7 @@ def test_status_endpoint_no_token_exposure():
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "client123",
                     "ClientSecret": "secret456",
-                    "Scope": "scope"
+                    "Scope": "scope",
                 }
             }
         }
@@ -121,7 +119,7 @@ def test_status_endpoint_no_token_exposure():
 
     # Call test server endpoint
     output = Mock()
-    result = handle_rest_api_test_server(output, "/dicomweb-oauth/servers/test-server/test")
+    handle_rest_api_test_server(output, "/dicomweb-oauth/servers/test-server/test")
 
     # Parse response
     response = json.loads(output.AnswerBuffer.call_args[0][0])

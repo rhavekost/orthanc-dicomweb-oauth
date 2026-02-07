@@ -1,8 +1,7 @@
 import pytest
 import responses
-import time
-from datetime import datetime, timedelta
-from src.token_manager import TokenManager, TokenAcquisitionError
+
+from src.token_manager import TokenAcquisitionError, TokenManager
 
 
 @responses.activate
@@ -14,16 +13,16 @@ def test_acquire_token_success():
         json={
             "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
             "token_type": "Bearer",
-            "expires_in": 3600
+            "expires_in": 3600,
         },
-        status=200
+        status=200,
     )
 
     config = {
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "client123",
         "ClientSecret": "secret456",
-        "Scope": "https://dicom.example.com/.default"
+        "Scope": "https://dicom.example.com/.default",
     }
 
     manager = TokenManager("test-server", config)
@@ -47,19 +46,15 @@ def test_token_caching():
     responses.add(
         responses.POST,
         "https://login.example.com/oauth2/token",
-        json={
-            "access_token": "token123",
-            "token_type": "Bearer",
-            "expires_in": 3600
-        },
-        status=200
+        json={"access_token": "token123", "token_type": "Bearer", "expires_in": 3600},
+        status=200,
     )
 
     config = {
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "client123",
         "ClientSecret": "secret456",
-        "Scope": "scope"
+        "Scope": "scope",
     }
 
     manager = TokenManager("test-server", config)
@@ -82,24 +77,16 @@ def test_token_refresh_before_expiry():
     responses.add(
         responses.POST,
         "https://login.example.com/oauth2/token",
-        json={
-            "access_token": "token1",
-            "token_type": "Bearer",
-            "expires_in": 10
-        },
-        status=200
+        json={"access_token": "token1", "token_type": "Bearer", "expires_in": 10},
+        status=200,
     )
 
     # Second token (after refresh)
     responses.add(
         responses.POST,
         "https://login.example.com/oauth2/token",
-        json={
-            "access_token": "token2",
-            "token_type": "Bearer",
-            "expires_in": 3600
-        },
-        status=200
+        json={"access_token": "token2", "token_type": "Bearer", "expires_in": 3600},
+        status=200,
     )
 
     config = {
@@ -107,7 +94,7 @@ def test_token_refresh_before_expiry():
         "ClientId": "client123",
         "ClientSecret": "secret456",
         "Scope": "scope",
-        "TokenRefreshBufferSeconds": 300  # 5 minutes buffer
+        "TokenRefreshBufferSeconds": 300,  # 5 minutes buffer
     }
 
     manager = TokenManager("test-server", config)
@@ -131,14 +118,14 @@ def test_token_acquisition_failure():
         responses.POST,
         "https://login.example.com/oauth2/token",
         json={"error": "invalid_client"},
-        status=401
+        status=401,
     )
 
     config = {
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "invalid_client",
         "ClientSecret": "wrong_secret",
-        "Scope": "scope"
+        "Scope": "scope",
     }
 
     manager = TokenManager("test-server", config)
@@ -155,7 +142,7 @@ def test_ssl_verification_enabled_by_default():
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "client123",
         "ClientSecret": "secret456",
-        "Scope": "scope"
+        "Scope": "scope",
     }
 
     manager = TokenManager("test-server", config)
@@ -164,7 +151,7 @@ def test_ssl_verification_enabled_by_default():
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = {
             "access_token": "test_token",
-            "expires_in": 3600
+            "expires_in": 3600,
         }
 
         manager._acquire_token()
@@ -184,7 +171,7 @@ def test_ssl_verification_can_be_disabled_explicitly():
         "ClientId": "client123",
         "ClientSecret": "secret456",
         "Scope": "scope",
-        "VerifySSL": False
+        "VerifySSL": False,
     }
 
     manager = TokenManager("test-server", config)
@@ -193,7 +180,7 @@ def test_ssl_verification_can_be_disabled_explicitly():
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = {
             "access_token": "test_token",
-            "expires_in": 3600
+            "expires_in": 3600,
         }
 
         manager._acquire_token()
@@ -213,7 +200,7 @@ def test_ssl_verification_with_custom_ca_bundle():
         "ClientId": "client123",
         "ClientSecret": "secret456",
         "Scope": "scope",
-        "VerifySSL": "/path/to/ca-bundle.crt"
+        "VerifySSL": "/path/to/ca-bundle.crt",
     }
 
     manager = TokenManager("test-server", config)
@@ -222,7 +209,7 @@ def test_ssl_verification_with_custom_ca_bundle():
         mock_post.return_value.status_code = 200
         mock_post.return_value.json.return_value = {
             "access_token": "test_token",
-            "expires_in": 3600
+            "expires_in": 3600,
         }
 
         manager._acquire_token()

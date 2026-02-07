@@ -1,17 +1,18 @@
 """OAuth2 token acquisition and caching for DICOMweb connections."""
 import logging
-import time
 import threading
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional
-import requests
+from typing import Any, Dict, Optional
 
+import requests
 
 logger = logging.getLogger(__name__)
 
 
 class TokenAcquisitionError(Exception):
     """Raised when token acquisition fails."""
+
     pass
 
 
@@ -50,7 +51,8 @@ class TokenManager:
 
         if missing_keys:
             raise ValueError(
-                f"Server '{self.server_name}' missing required config keys: {missing_keys}"
+                f"Server '{self.server_name}' missing required config keys: "
+                f"{missing_keys}"
             )
 
     def get_token(self) -> str:
@@ -112,14 +114,16 @@ class TokenManager:
                     data=data,
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                     timeout=30,
-                    verify=self.verify_ssl  # Explicit SSL verification
+                    verify=self.verify_ssl,  # Explicit SSL verification
                 )
                 response.raise_for_status()
 
                 token_data = response.json()
                 self._cached_token = token_data["access_token"]
                 expires_in = token_data.get("expires_in", 3600)
-                self._token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+                self._token_expiry = datetime.now(timezone.utc) + timedelta(
+                    seconds=expires_in
+                )
 
                 logger.info(
                     f"Token acquired for server '{self.server_name}', "
@@ -132,7 +136,8 @@ class TokenManager:
                 if attempt < max_retries - 1:
                     logger.warning(
                         f"Token acquisition attempt {attempt + 1} failed for "
-                        f"server '{self.server_name}': {e}. Retrying in {retry_delay}s..."
+                        f"server '{self.server_name}': {e}. "
+                        f"Retrying in {retry_delay}s..."
                     )
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
@@ -147,11 +152,20 @@ class TokenManager:
 
             except requests.RequestException as e:
                 # Non-retryable errors (4xx, 5xx)
-                error_msg = f"Failed to acquire token for server '{self.server_name}': {e}"
+                error_msg = (
+                    f"Failed to acquire token for server '{self.server_name}': {e}"
+                )
                 logger.error(error_msg)
                 raise TokenAcquisitionError(error_msg) from e
 
             except (KeyError, ValueError) as e:
-                error_msg = f"Invalid token response for server '{self.server_name}': {e}"
+                error_msg = (
+                    f"Invalid token response for server '{self.server_name}': {e}"
+                )
                 logger.error(error_msg)
                 raise TokenAcquisitionError(error_msg) from e
+
+        # This should never be reached, but satisfies mypy
+        raise TokenAcquisitionError(
+            f"Failed to acquire token for server '{self.server_name}'"
+        )

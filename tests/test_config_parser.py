@@ -1,6 +1,6 @@
 import pytest
-import os
-from src.config_parser import ConfigParser, ConfigError
+
+from src.config_parser import ConfigError, ConfigParser
 
 
 def test_parse_basic_server_config():
@@ -13,7 +13,7 @@ def test_parse_basic_server_config():
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "client123",
                     "ClientSecret": "secret456",
-                    "Scope": "https://dicom.example.com/.default"
+                    "Scope": "https://dicom.example.com/.default",
                 }
             }
         }
@@ -41,7 +41,7 @@ def test_env_var_substitution(monkeypatch):
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "${TEST_CLIENT_ID}",
                     "ClientSecret": "${TEST_SECRET}",
-                    "Scope": "https://dicom.example.com/.default"
+                    "Scope": "https://dicom.example.com/.default",
                 }
             }
         }
@@ -64,7 +64,7 @@ def test_missing_env_var_raises_error(monkeypatch):
                     "TokenEndpoint": "https://login.example.com/oauth2/token",
                     "ClientId": "${MISSING_VAR}",
                     "ClientSecret": "secret",
-                    "Scope": "scope"
+                    "Scope": "scope",
                 }
             }
         }

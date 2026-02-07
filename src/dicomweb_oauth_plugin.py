@@ -11,14 +11,14 @@ from typing import Dict, Optional
 
 try:
     import orthanc
+
     ORTHANC_AVAILABLE = True
 except ImportError:
     ORTHANC_AVAILABLE = False
     orthanc = None
 
-from src.config_parser import ConfigParser, ConfigError
-from src.token_manager import TokenManager, TokenAcquisitionError
-
+from src.config_parser import ConfigError, ConfigParser
+from src.token_manager import TokenAcquisitionError, TokenManager
 
 # Plugin version
 __version__ = "1.0.0"
@@ -57,7 +57,9 @@ def initialize_plugin(orthanc_module=None):
             _token_managers[server_name] = TokenManager(server_name, server_config)
             _server_urls[server_name] = server_config["Url"]
 
-            logger.info(f"Server '{server_name}' configured with URL: {server_config['Url']}")
+            logger.info(
+                f"Server '{server_name}' configured with URL: {server_config['Url']}"
+            )
 
         logger.info(f"DICOMweb OAuth plugin initialized with {len(servers)} server(s)")
 
@@ -69,8 +71,13 @@ def initialize_plugin(orthanc_module=None):
         raise
 
 
-def on_outgoing_http_request(uri: str, method: str, headers: Dict[str, str],
-                              get_params: Dict[str, str], body: bytes) -> Dict:
+def on_outgoing_http_request(
+    uri: str,
+    method: str,
+    headers: Dict[str, str],
+    get_params: Dict[str, str],
+    body: bytes,
+) -> Dict:
     """
     Orthanc HTTP filter callback - injects OAuth2 bearer tokens.
 
@@ -113,7 +120,7 @@ def on_outgoing_http_request(uri: str, method: str, headers: Dict[str, str],
             "method": method,
             "uri": uri,
             "get_params": get_params,
-            "body": body
+            "body": body,
         }
 
     except TokenAcquisitionError as e:
@@ -121,11 +128,13 @@ def on_outgoing_http_request(uri: str, method: str, headers: Dict[str, str],
         # Return error response
         return {
             "status": 503,
-            "body": json.dumps({
-                "error": "OAuth token acquisition failed",
-                "server": server_name,
-                "details": str(e)
-            })
+            "body": json.dumps(
+                {
+                    "error": "OAuth token acquisition failed",
+                    "server": server_name,
+                    "details": str(e),
+                }
+            ),
         }
 
 
@@ -161,7 +170,7 @@ def handle_rest_api_status(output, uri, **request):
         "version": __version__,
         "status": "active",
         "configured_servers": len(_token_managers),
-        "servers": list(_token_managers.keys())
+        "servers": list(_token_managers.keys()),
     }
 
     output.AnswerBuffer(json.dumps(status, indent=2), "application/json")
@@ -184,7 +193,9 @@ def handle_rest_api_servers(output, uri, **request):
             "url": _server_urls[server_name],
             "token_endpoint": token_manager.token_endpoint,
             "has_cached_token": token_manager._cached_token is not None,
-            "token_valid": token_manager._is_token_valid() if token_manager._cached_token else False
+            "token_valid": token_manager._is_token_valid()
+            if token_manager._cached_token
+            else False,
         }
         servers.append(server_info)
 
@@ -200,12 +211,12 @@ def handle_rest_api_test_server(output, uri, **request):
     global _token_managers
 
     # Extract server name from URI
-    parts = uri.split('/')
+    parts = uri.split("/")
     if len(parts) < 4:
         output.AnswerBuffer(
             json.dumps({"error": "Server name not specified"}),
             "application/json",
-            status=400
+            status=400,
         )
         return
 
@@ -215,7 +226,7 @@ def handle_rest_api_test_server(output, uri, **request):
         output.AnswerBuffer(
             json.dumps({"error": f"Server '{server_name}' not configured"}),
             "application/json",
-            status=404
+            status=404,
         )
         return
 
@@ -227,21 +238,15 @@ def handle_rest_api_test_server(output, uri, **request):
             "server": server_name,
             "status": "success",
             "token_acquired": True,
-            "has_token": token is not None
+            "has_token": token is not None,
         }
 
         output.AnswerBuffer(json.dumps(result, indent=2), "application/json")
 
     except TokenAcquisitionError as e:
-        result = {
-            "server": server_name,
-            "status": "error",
-            "error": str(e)
-        }
+        result = {"server": server_name, "status": "error", "error": str(e)}
         output.AnswerBuffer(
-            json.dumps(result, indent=2),
-            "application/json",
-            status=503
+            json.dumps(result, indent=2), "application/json", status=503
         )
 
 
@@ -265,9 +270,11 @@ if ORTHANC_AVAILABLE and orthanc is not None:
 
         # Register REST API endpoints
         logger.info("Registering REST API endpoints")
-        orthanc.RegisterRestCallback('/dicomweb-oauth/status', handle_rest_api_status)
-        orthanc.RegisterRestCallback('/dicomweb-oauth/servers', handle_rest_api_servers)
-        orthanc.RegisterRestCallback('/dicomweb-oauth/servers/(.*)/test', handle_rest_api_test_server)
+        orthanc.RegisterRestCallback("/dicomweb-oauth/status", handle_rest_api_status)
+        orthanc.RegisterRestCallback("/dicomweb-oauth/servers", handle_rest_api_servers)
+        orthanc.RegisterRestCallback(
+            "/dicomweb-oauth/servers/(.*)/test", handle_rest_api_test_server
+        )
 
         logger.info("DICOMweb OAuth plugin registered successfully")
     except Exception as e:
