@@ -18,9 +18,21 @@ except ImportError:
     _ORTHANC_AVAILABLE = False
     orthanc = None
 
+try:
+    from flask import Flask, jsonify, request
+
+    _FLASK_AVAILABLE = True
+except ImportError:
+    _FLASK_AVAILABLE = False
+    Flask = None
+    jsonify = None
+    request = None
+
 from src.config_parser import ConfigError, ConfigParser
 from src.metrics import get_metrics_text
 from src.plugin_context import PluginContext
+from src.rate_limiter import RateLimiter, RateLimitExceeded
+from src.structured_logger import structured_logger
 from src.token_manager import TokenAcquisitionError, TokenManager
 
 # Plugin version
@@ -339,6 +351,137 @@ def metrics_endpoint(output: Any, uri: str, **_request: Any) -> None:
         logger.error(f"Failed to generate metrics: {e}")
         error_message = f"Error generating metrics: {e}"
         output.AnswerBuffer(error_message, "text/plain", status=500)
+
+
+# Flask app for testing with rate limiting
+def create_flask_app(
+    servers_config: Dict[str, Any],
+    rate_limit_requests: int = 10,
+    rate_limit_window: int = 60,
+) -> Any:
+    """
+    Create Flask application with rate limiting for testing.
+
+    Args:
+        servers_config: Server configurations
+        rate_limit_requests: Max requests per window
+        rate_limit_window: Time window in seconds
+
+    Returns:
+        Configured Flask application
+    """
+    if not _FLASK_AVAILABLE:
+        raise ImportError("Flask is required for create_flask_app")
+
+    app = Flask(__name__)
+
+    # Initialize rate limiter
+    app.rate_limiter = RateLimiter(
+        max_requests=rate_limit_requests, window_seconds=rate_limit_window
+    )
+
+    structured_logger.info(
+        "Rate limiting enabled",
+        max_requests=rate_limit_requests,
+        window_seconds=rate_limit_window,
+    )
+
+    # Initialize plugin context with test configuration
+    context = PluginContext.get_instance()
+    context.token_managers.clear()
+    context.server_urls.clear()
+
+    for server_name, server_config in servers_config.items():
+        if "TokenEndpoint" in server_config:
+            manager = TokenManager(server_name, server_config)
+            context.register_token_manager(
+                server_name=server_name,
+                manager=manager,
+                url=server_config.get("Url", f"https://{server_name}"),
+            )
+
+    # Rate limiting middleware
+    @app.before_request  # type: ignore[misc]
+    def check_rate_limit() -> Any:
+        """Check rate limit before processing request."""
+        # Use remote address as rate limit key
+        client_key = request.remote_addr or "unknown"
+
+        try:
+            app.rate_limiter.check_rate_limit(client_key)
+        except RateLimitExceeded as e:
+            # Log security event
+            structured_logger.security_event(
+                event_type="rate_limit_exceeded",
+                operation="rate_limit",
+                client_ip=client_key,
+                endpoint=request.endpoint,
+                method=request.method,
+                max_requests=e.max_requests,
+                window_seconds=e.window_seconds,
+            )
+
+            return (
+                jsonify(
+                    {
+                        "error": str(e),
+                        "max_requests": e.max_requests,
+                        "window_seconds": e.window_seconds,
+                    }
+                ),
+                429,
+            )
+
+        return None
+
+    # Register routes
+    @app.route("/dicomweb-oauth/status", methods=["GET"])  # type: ignore[misc]
+    def handle_status() -> Any:
+        """Handle status endpoint."""
+        try:
+            data = {
+                "status": "healthy",
+                "token_managers": len(context.token_managers),
+                "servers_configured": len(context.server_urls),
+            }
+            response = create_api_response(data)
+            return jsonify(response)
+        except Exception as e:
+            error_response = create_api_response({"status": "error", "error": str(e)})
+            return jsonify(error_response)
+
+    @app.route(  # type: ignore[misc]
+        "/dicomweb-oauth/servers/<name>/test", methods=["POST"]
+    )
+    def handle_test(name: str) -> Any:
+        """Handle test endpoint."""
+        if name not in context.token_managers:
+            return (
+                jsonify({"error": f"Server '{name}' not configured"}),
+                404,
+            )
+
+        try:
+            token_manager = context.get_token_manager(name)
+            if token_manager is None:
+                return jsonify({"error": f"Server '{name}' not configured"}), 404
+
+            token = token_manager.get_token()
+
+            result = {
+                "server": name,
+                "status": "success",
+                "token_acquired": True,
+                "has_token": token is not None,
+            }
+
+            return jsonify(result)
+
+        except TokenAcquisitionError as e:
+            result = {"server": name, "status": "error", "error": str(e)}
+            return jsonify(result), 503
+
+    return app
 
 
 # Orthanc plugin entry point

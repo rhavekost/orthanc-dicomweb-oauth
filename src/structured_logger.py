@@ -198,6 +198,30 @@ class StructuredLogger:
         """Log critical message."""
         self._log(logging.CRITICAL, message, **kwargs)
 
+    def security_event(self, event_type: str, **kwargs: Any) -> None:
+        """
+        Log security event with security tag.
+
+        Security events include:
+        - auth_failure: Failed authentication attempts
+        - auth_success: Successful authentication
+        - token_validation_failure: Token validation failures
+        - rate_limit_exceeded: Rate limit violations
+        - ssl_verification_failure: SSL/TLS verification failures
+        - config_change: Configuration changes
+        - unauthorized_access: Unauthorized API access attempts
+
+        Args:
+            event_type: Type of security event
+            **kwargs: Additional context fields
+        """
+        # Add security event tag
+        kwargs["security_event"] = True
+        kwargs["event_type"] = event_type
+
+        # Log at WARNING level (security events are important)
+        self._log(logging.WARNING, f"Security event: {event_type}", **kwargs)
+
 
 class JsonFormatter(logging.Formatter):
     """JSON log formatter."""
