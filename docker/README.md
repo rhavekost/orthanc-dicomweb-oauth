@@ -1,4 +1,31 @@
-# Docker Development Environment
+# Docker Configuration
+
+## ⚠️ SECURITY WARNING
+
+The default `orthanc.json` configuration is **FOR DEVELOPMENT ONLY** and has security features disabled for ease of testing.
+
+**For production deployments:**
+1. Use `orthanc-secure.json` as your base configuration
+2. Enable authentication (`"AuthenticationEnabled": true`)
+3. Change default passwords immediately
+4. Enable SSL/TLS (`"Ssl": true`)
+5. Review all security settings
+
+**NEVER deploy the development configuration to production or any environment handling real patient data (PHI).**
+
+## Configuration Files
+
+### orthanc.json (Development)
+- Authentication: ✅ Enabled (default credentials: orthanc/orthanc)
+- Remote Access: Enabled
+- SSL: Disabled
+- Use for: Local development, testing only
+
+### orthanc-secure.json (Production Template)
+- Authentication: ✅ Enabled (must change password)
+- Remote Access: Enabled with authentication
+- SSL: ✅ Enabled
+- Use for: Production deployments, staging environments
 
 ## Quick Start
 

@@ -1,12 +1,12 @@
 {
-  "Name": "Orthanc DICOMweb OAuth Development",
+  "Name": "Orthanc DICOMweb OAuth Production",
   "HttpPort": 8042,
   "DicomPort": 4242,
 
   "RemoteAccessAllowed": true,
   "AuthenticationEnabled": true,
   "RegisteredUsers": {
-    "orthanc": "orthanc"
+    "admin": "CHANGE_THIS_PASSWORD_IMMEDIATELY"
   },
 
   "Plugins": [
@@ -18,7 +18,7 @@
     "Root": "/dicom-web/",
     "EnableWado": true,
     "WadoRoot": "/wado",
-    "Ssl": false,
+    "Ssl": true,
     "QidoCaseSensitive": false,
     "Host": "0.0.0.0",
     "Port": 8042
@@ -26,17 +26,18 @@
 
   "DicomWebOAuth": {
     "Servers": {
-      "example-server": {
+      "production-server": {
         "Url": "https://dicom.example.com/v2/",
         "TokenEndpoint": "https://login.example.com/oauth2/token",
         "ClientId": "${OAUTH_CLIENT_ID}",
         "ClientSecret": "${OAUTH_CLIENT_SECRET}",
         "Scope": "https://dicom.example.com/.default",
-        "TokenRefreshBufferSeconds": 300
+        "TokenRefreshBufferSeconds": 300,
+        "VerifySSL": true
       }
     }
   },
 
-  "Verbosity": "verbose",
+  "Verbosity": "default",
   "LogLevel": "default"
 }

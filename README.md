@@ -13,6 +13,24 @@ Generic OAuth2/OIDC token management plugin for Orthanc's DICOMweb connections. 
 ✅ **Monitoring endpoints** - REST API for status checks and testing
 ✅ **Retry logic** - Automatic retry with exponential backoff for network errors
 
+## ⚠️ Security Notice
+
+**This plugin handles authentication credentials for healthcare systems containing Protected Health Information (PHI).**
+
+### Before Production Deployment:
+
+1. **Review Security Documentation**: Read `docs/security-best-practices.md`
+2. **Enable Authentication**: Set `"AuthenticationEnabled": true` in Orthanc configuration
+3. **Secure Secrets**: Never commit credentials to version control
+4. **Use SSL/TLS**: Enable certificate verification for all OAuth endpoints
+5. **Review Configuration**: Use `docker/orthanc-secure.json` as production template
+
+**Current Security Score: 62/100 (Grade D) - See [Security Assessment](docs/comprehensive-project-assessment.md#5-security-62100--critical-issues)**
+
+Critical security improvements are in progress. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+---
+
 ## Problem Solved
 
 Orthanc's DICOMweb plugin only supports HTTP Basic auth or static headers. This plugin enables Orthanc to connect to any OAuth2-protected DICOMweb server:
