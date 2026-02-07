@@ -1,11 +1,13 @@
 """Azure Active Directory (Entra ID) OAuth provider."""
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import jwt
 from jwt import PyJWKClient
 
-from src.oauth_providers.base import OAuthConfig
+from src.jwt_validator import JWTValidator
+from src.oauth_providers.base import OAuthConfig, OAuthProvider
 from src.oauth_providers.generic import GenericOAuth2Provider
+from src.structured_logger import structured_logger
 
 if TYPE_CHECKING:
     from src.http_client import HttpClient
@@ -23,16 +25,67 @@ class AzureOAuthProvider(GenericOAuth2Provider):
 
     def __init__(
         self,
-        config: OAuthConfig,
-        tenant_id: str,
+        config: Dict[str, Any],
+        tenant_id: Optional[str] = None,
         http_client: Optional["HttpClient"] = None,
     ):
-        super().__init__(config, http_client=http_client)
+        """
+        Initialize Azure OAuth provider.
+
+        Args:
+            config: Dict configuration or OAuthConfig
+            tenant_id: Optional tenant ID (extracted from config if not provided)
+            http_client: Optional HTTP client
+        """
+        # Support both Dict and OAuthConfig
+        if isinstance(config, dict):
+            tenant_id = tenant_id or config.get("TenantId", "common")
+            # Call parent with dict config (GenericOAuth2Provider handles conversion)
+            # But we need to bypass parent's __init__ to avoid double init
+            # So we'll duplicate the logic here
+            oauth_config = OAuthConfig(
+                token_endpoint=config["TokenEndpoint"],
+                client_id=config["ClientId"],
+                client_secret=config["ClientSecret"],
+                scope=config.get("Scope", ""),
+                verify_ssl=config.get("VerifySSL", True),
+            )
+        else:
+            oauth_config = config
+            tenant_id = tenant_id or "common"
+
+        # Call OAuthProvider.__init__ directly
+        OAuthProvider.__init__(self, oauth_config, http_client)
+
         self.tenant_id = tenant_id
         self.jwks_uri = (
             f"https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys"
         )
         self.issuer = f"https://login.microsoftonline.com/{tenant_id}/v2.0"
+
+        # Initialize JWT validator for Azure
+        if isinstance(config, dict):
+            jwt_public_key = config.get("JWTPublicKey")
+            jwt_audience = config.get("JWTAudience")
+            jwt_issuer = config.get("JWTIssuer")
+
+            self.jwt_validator = JWTValidator(
+                public_key=jwt_public_key.encode() if jwt_public_key else None,
+                expected_audience=jwt_audience,
+                expected_issuer=jwt_issuer,
+                algorithms=["RS256"],  # Azure uses RS256
+            )
+
+            if self.jwt_validator.enabled:
+                structured_logger.info(
+                    "JWT validation enabled for Azure",
+                    provider=self.provider_name,
+                    audience=jwt_audience,
+                    issuer=jwt_issuer,
+                )
+        else:
+            # No JWT validator for OAuthConfig-based init
+            self.jwt_validator = JWTValidator(public_key=None)
 
     @property
     def provider_name(self) -> str:

@@ -1,8 +1,17 @@
 """Generic OAuth2 client credentials provider."""
+from typing import Any, Optional
+
 import requests
 
 from src.error_codes import ErrorCode, NetworkError
-from src.oauth_providers.base import OAuthProvider, OAuthToken, TokenAcquisitionError
+from src.jwt_validator import JWTValidator
+from src.oauth_providers.base import (
+    OAuthConfig,
+    OAuthProvider,
+    OAuthToken,
+    TokenAcquisitionError,
+)
+from src.structured_logger import structured_logger
 
 # Token configuration constants (shared with token_manager)
 TOKEN_REQUEST_TIMEOUT_SECONDS = 30
@@ -16,6 +25,57 @@ class GenericOAuth2Provider(OAuthProvider):
     Works with any OAuth2-compliant provider that supports
     the client credentials grant type.
     """
+
+    def __init__(self, config: Any, http_client: Optional[Any] = None) -> None:
+        """
+        Initialize generic OAuth provider.
+
+        Args:
+            config: Dict configuration or OAuthConfig
+            http_client: Optional HTTP client
+        """
+        # Support both Dict and OAuthConfig
+        if isinstance(config, dict):
+            # Dict config - convert to OAuthConfig
+            oauth_config = OAuthConfig(
+                token_endpoint=config["TokenEndpoint"],
+                client_id=config["ClientId"],
+                client_secret=config["ClientSecret"],
+                scope=config.get("Scope", ""),
+                verify_ssl=config.get("VerifySSL", True),
+            )
+
+            # Call parent init
+            super().__init__(oauth_config, http_client)
+
+            # Initialize JWT validator if configured (only for dict config)
+            jwt_public_key = config.get("JWTPublicKey")
+            jwt_audience = config.get("JWTAudience")
+            jwt_issuer = config.get("JWTIssuer")
+            jwt_algorithms = config.get("JWTAlgorithms", ["RS256"])
+
+            self.jwt_validator = JWTValidator(
+                public_key=jwt_public_key.encode() if jwt_public_key else None,
+                expected_audience=jwt_audience,
+                expected_issuer=jwt_issuer,
+                algorithms=jwt_algorithms
+                if isinstance(jwt_algorithms, list)
+                else [jwt_algorithms],
+            )
+
+            if self.jwt_validator.enabled:
+                structured_logger.info(
+                    "JWT validation enabled",
+                    provider=self.provider_name,
+                    audience=jwt_audience,
+                    issuer=jwt_issuer,
+                    algorithms=jwt_algorithms,
+                )
+        else:
+            # OAuthConfig - use as-is
+            super().__init__(config, http_client)
+            # No JWT validator for OAuthConfig-based init
+            self.jwt_validator = JWTValidator(public_key=None)
 
     @property
     def provider_name(self) -> str:
@@ -84,10 +144,6 @@ class GenericOAuth2Provider(OAuthProvider):
                 f"Failed to acquire token: {e}",
                 details={"endpoint": self.config.token_endpoint, "error": str(e)},
             ) from e
-
-    def validate_token(self, token: str) -> bool:
-        """Generic provider doesn't validate tokens."""
-        return True  # Override in provider-specific implementations
 
     def refresh_token(self, refresh_token: str) -> OAuthToken:
         """Refresh access token."""

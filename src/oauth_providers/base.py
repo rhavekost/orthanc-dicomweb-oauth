@@ -75,18 +75,26 @@ class OAuthProvider(ABC):
         """
         pass
 
-    @abstractmethod
     def validate_token(self, token: str) -> bool:
         """
-        Validate token signature (if applicable).
+        Validate access token.
+
+        Base implementation performs JWT signature validation if configured.
+        Subclasses can override to add provider-specific validation.
 
         Args:
-            token: JWT token to validate
+            token: Access token to validate
 
         Returns:
-            True if valid, False otherwise
+            True if token is valid, False otherwise
         """
-        pass
+        # Check if JWT validator is configured
+        if hasattr(self, "jwt_validator") and self.jwt_validator.enabled:
+            result: bool = self.jwt_validator.validate(token)
+            return result
+
+        # No validation configured, assume valid
+        return True
 
     @abstractmethod
     def refresh_token(self, refresh_token: str) -> OAuthToken:
