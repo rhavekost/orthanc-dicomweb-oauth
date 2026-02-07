@@ -5,6 +5,8 @@ import re
 import sys
 import uuid
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 # Secret patterns to redact
@@ -83,17 +85,53 @@ class StructuredLogger:
     Secrets are automatically redacted from all log entries.
     """
 
-    def __init__(self, name: str = "oauth-plugin"):
+    def __init__(
+        self,
+        name: str = "oauth-plugin",
+        log_file: Optional[str] = None,
+        max_bytes: int = 10 * 1024 * 1024,
+        backup_count: int = 5,
+    ):
+        """
+        Initialize structured logger.
+
+        Args:
+            name: Logger name
+            log_file: Optional file path for log rotation
+            max_bytes: Max bytes per log file (default 10MB)
+            backup_count: Number of backup files (default 5)
+        """
         self.logger = logging.getLogger(name)
         self.context: Dict[str, Any] = {}
         self.correlation_id: Optional[str] = None
-        self._setup_handler()
+        self._setup_handler(log_file, max_bytes, backup_count)
 
-    def _setup_handler(self):
-        """Setup JSON formatter and handler."""
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(JsonFormatter())
-        self.logger.addHandler(handler)
+    def _setup_handler(
+        self, log_file: Optional[str], max_bytes: int, backup_count: int
+    ):
+        """Setup JSON formatter and handler(s)."""
+        formatter = JsonFormatter()
+
+        # Always add stdout handler
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setFormatter(formatter)
+        self.logger.addHandler(stdout_handler)
+
+        # Add file handler with rotation if specified
+        if log_file:
+            # Ensure log directory exists
+            log_path = Path(log_file)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+
+            file_handler = RotatingFileHandler(
+                filename=log_file,
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+
         self.logger.setLevel(logging.INFO)
 
     def set_context(self, **kwargs):
