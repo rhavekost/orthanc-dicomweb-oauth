@@ -16,6 +16,15 @@ services:
       # Mount source for development (hot reload)
       - ../src:/etc/orthanc/plugins:ro
       - orthanc-storage:/var/lib/orthanc/db
+
+      # Backup volume (optional)
+      # Uncomment to mount backup directory for easy access
+      # - /backup/orthanc:/backup:rw
+    labels:
+      # Backup-friendly labels for automation tools
+      - "backup.enable=true"
+      - "backup.frequency=daily"
+      - "backup.retention=30d"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8042/system"]
@@ -44,6 +53,18 @@ services:
       - STAGING_OAUTH_CLIENT_SECRET=${STAGING_OAUTH_CLIENT_SECRET}
       - STAGING_OAUTH_SCOPE=${STAGING_OAUTH_SCOPE}
     restart: unless-stopped
+
+  # Optional: Automated backup service
+  # Uncomment to enable automated backups using docker-volume-backup
+  # backup:
+  #   image: offen/docker-volume-backup:latest
+  #   volumes:
+  #     - orthanc-storage:/backup/orthanc-storage:ro
+  #     - /backup:/archive
+  #   environment:
+  #     BACKUP_CRON_EXPRESSION: "0 2 * * *"  # Daily at 2 AM
+  #     BACKUP_FILENAME: orthanc-backup-%Y%m%d-%H%M%S.tar.gz
+  #     BACKUP_RETENTION_DAYS: 30
 
 volumes:
   orthanc-storage:
