@@ -1,0 +1,15 @@
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "aws-healthimaging": {
+        "DicomWebRoot": "https://medical-imaging.{region}.amazonaws.com/datastore/{datastore-id}/imageSet",
+        "ProviderType": "aws",
+        "TokenEndpoint": "https://sts.amazonaws.com/",
+        "Region": "us-west-2",
+        "ClientId": "${AWS_ACCESS_KEY_ID}",
+        "ClientSecret": "${AWS_SECRET_ACCESS_KEY}",
+        "UseInstanceProfile": false
+      }
+    }
+  }
+}
