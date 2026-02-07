@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Orthanc DICOMweb OAuth Configuration",
+  "description": "JSON Schema for validating DICOMweb OAuth plugin configuration",
+  "type": "object",
+  "required": ["DicomWebOAuth"],
+  "properties": {
+    "DicomWebOAuth": {
+      "type": "object",
+      "required": ["Servers"],
+      "properties": {
+        "Servers": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/definitions/ServerConfig"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "ServerConfig": {
+      "type": "object",
+      "required": ["Url", "TokenEndpoint", "ClientId", "ClientSecret"],
+      "properties": {
+        "Url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
+          "description": "DICOMweb server URL"
+        },
+        "TokenEndpoint": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
+          "description": "OAuth2 token endpoint URL"
+        },
+        "ClientId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OAuth2 client ID"
+        },
+        "ClientSecret": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OAuth2 client secret"
+        },
+        "Scope": {
+          "type": "string",
+          "description": "OAuth2 scope"
+        },
+        "VerifySSL": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify SSL certificates"
+        },
+        "TokenRefreshBufferSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "default": 300,
+          "description": "Token refresh buffer in seconds"
+        },
+        "ProviderType": {
+          "type": "string",
+          "enum": ["auto", "azure", "google", "keycloak", "generic"],
+          "default": "auto",
+          "description": "OAuth provider type"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

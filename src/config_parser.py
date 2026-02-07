@@ -3,6 +3,8 @@ import os
 import re
 from typing import Any, Dict
 
+from src.config_schema import validate_config
+
 
 class ConfigError(Exception):
     """Raised when configuration is invalid."""
@@ -13,18 +15,24 @@ class ConfigError(Exception):
 class ConfigParser:
     """Parse and validate plugin configuration from Orthanc JSON config."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], validate_schema: bool = True):
         """
         Initialize parser with Orthanc configuration.
 
         Args:
             config: Full Orthanc configuration dict
+            validate_schema: Whether to validate against JSON Schema (default True)
         """
         self.config = config
-        self._validate_config()
+        self._validate_config(validate_schema=validate_schema)
 
-    def _validate_config(self) -> None:
-        """Validate that required configuration structure exists."""
+    def _validate_config(self, validate_schema: bool = True) -> None:
+        """
+        Validate that required configuration structure exists.
+
+        Args:
+            validate_schema: Whether to validate against JSON Schema
+        """
         if "DicomWebOAuth" not in self.config:
             raise ConfigError("Missing 'DicomWebOAuth' section in configuration")
 
@@ -32,6 +40,13 @@ class ConfigParser:
             raise ConfigError(
                 "Missing 'Servers' section in DicomWebOAuth configuration"
             )
+
+        # Validate against JSON Schema if enabled
+        if validate_schema:
+            try:
+                validate_config(self.config)
+            except Exception as e:
+                raise ConfigError(f"Configuration validation failed: {e}") from e
 
     def get_servers(self) -> Dict[str, Dict[str, Any]]:
         """
