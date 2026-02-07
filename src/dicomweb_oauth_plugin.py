@@ -20,6 +20,9 @@ from src.config_parser import ConfigParser, ConfigError
 from src.token_manager import TokenManager, TokenAcquisitionError
 
 
+# Plugin version
+__version__ = "1.0.0"
+
 # Global state
 _token_managers: Dict[str, TokenManager] = {}
 _server_urls: Dict[str, str] = {}
@@ -145,6 +148,104 @@ def _find_server_for_uri(uri: str) -> Optional[str]:
     return None
 
 
+def handle_rest_api_status(output, uri, **request):
+    """
+    GET /dicomweb-oauth/status
+
+    Returns plugin status and configuration summary.
+    """
+    global _token_managers
+
+    status = {
+        "plugin": "DICOMweb OAuth",
+        "version": __version__,
+        "status": "active",
+        "configured_servers": len(_token_managers),
+        "servers": list(_token_managers.keys())
+    }
+
+    output.AnswerBuffer(json.dumps(status, indent=2), "application/json")
+
+
+def handle_rest_api_servers(output, uri, **request):
+    """
+    GET /dicomweb-oauth/servers
+
+    Returns list of configured servers and their status.
+    """
+    global _token_managers, _server_urls
+
+    servers = []
+    for server_name in _token_managers.keys():
+        token_manager = _token_managers[server_name]
+
+        server_info = {
+            "name": server_name,
+            "url": _server_urls[server_name],
+            "token_endpoint": token_manager.token_endpoint,
+            "has_cached_token": token_manager._cached_token is not None,
+            "token_valid": token_manager._is_token_valid() if token_manager._cached_token else False
+        }
+        servers.append(server_info)
+
+    output.AnswerBuffer(json.dumps({"servers": servers}, indent=2), "application/json")
+
+
+def handle_rest_api_test_server(output, uri, **request):
+    """
+    POST /dicomweb-oauth/servers/{name}/test
+
+    Test token acquisition for a specific server.
+    """
+    global _token_managers
+
+    # Extract server name from URI
+    parts = uri.split('/')
+    if len(parts) < 4:
+        output.AnswerBuffer(
+            json.dumps({"error": "Server name not specified"}),
+            "application/json",
+            status=400
+        )
+        return
+
+    server_name = parts[-2]
+
+    if server_name not in _token_managers:
+        output.AnswerBuffer(
+            json.dumps({"error": f"Server '{server_name}' not configured"}),
+            "application/json",
+            status=404
+        )
+        return
+
+    try:
+        token_manager = _token_managers[server_name]
+        token = token_manager.get_token()
+
+        result = {
+            "server": server_name,
+            "status": "success",
+            "token_acquired": True,
+            "token_length": len(token),
+            "token_preview": token[:20] + "..." if len(token) > 20 else token
+        }
+
+        output.AnswerBuffer(json.dumps(result, indent=2), "application/json")
+
+    except TokenAcquisitionError as e:
+        result = {
+            "server": server_name,
+            "status": "error",
+            "error": str(e)
+        }
+        output.AnswerBuffer(
+            json.dumps(result, indent=2),
+            "application/json",
+            status=503
+        )
+
+
 # Orthanc plugin entry point
 def OnChange(changeType, level, resource):
     """Orthanc change callback (not used, but required by plugin API)."""
@@ -162,6 +263,13 @@ if ORTHANC_AVAILABLE and orthanc is not None:
         logger.info("Registering DICOMweb OAuth plugin with Orthanc")
         initialize_plugin()
         orthanc.RegisterOnOutgoingHttpRequestFilter(on_outgoing_http_request)
+
+        # Register REST API endpoints
+        logger.info("Registering REST API endpoints")
+        orthanc.RegisterRestCallback('/dicomweb-oauth/status', handle_rest_api_status)
+        orthanc.RegisterRestCallback('/dicomweb-oauth/servers', handle_rest_api_servers)
+        orthanc.RegisterRestCallback('/dicomweb-oauth/servers/(.*)/test', handle_rest_api_test_server)
+
         logger.info("DICOMweb OAuth plugin registered successfully")
     except Exception as e:
         logger.error(f"Failed to register plugin: {e}")
