@@ -36,9 +36,6 @@ except Exception:
 
 API_VERSION = "2.0"  # Major.Minor only
 
-# Global context instance
-_plugin_context: Optional[PluginContext] = None
-
 logger = logging.getLogger(__name__)
 
 
@@ -50,18 +47,14 @@ def initialize_plugin(
 
     Args:
         orthanc_module: Orthanc module (for testing, defaults to global orthanc)
-        context: Plugin context (for testing, creates new if None)
+        context: Plugin context (for testing, uses singleton if None)
     """
-    global _plugin_context
-
     if orthanc_module is None:
         orthanc_module = orthanc
 
-    # Create or use provided context (allows dependency injection in tests)
+    # Use singleton pattern instead of global
     if context is None:
-        context = PluginContext()
-
-    _plugin_context = context
+        context = PluginContext.get_instance()
 
     logger.info("Initializing DICOMweb OAuth plugin")
 
@@ -95,10 +88,8 @@ def initialize_plugin(
 
 
 def get_plugin_context() -> PluginContext:
-    """Get the plugin context (for use in callbacks)."""
-    if _plugin_context is None:
-        raise RuntimeError("Plugin not initialized")
-    return _plugin_context
+    """Get the plugin context (singleton)."""
+    return PluginContext.get_instance()
 
 
 def on_outgoing_http_request(
@@ -128,7 +119,7 @@ def on_outgoing_http_request(
     context = get_plugin_context()
 
     # Find which server this request is for
-    server_name = context.find_server_for_uri(uri)
+    server_name = context.find_server_for_url(uri)
 
     if server_name is None:
         # Not a configured OAuth server, let it pass through
