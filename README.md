@@ -12,11 +12,13 @@ Generic OAuth2/OIDC token management plugin for Orthanc's DICOMweb connections. 
 ✅ **Generic OAuth2** - Works with any OAuth2/OIDC provider (Azure, Google Cloud, Keycloak, Auth0, Okta, etc.)
 ✅ **Automatic token refresh** - Proactive refresh before expiration (configurable buffer)
 ✅ **Zero-downtime** - Thread-safe token caching, no interruption to DICOMweb operations
+✅ **Circuit breaker** - Prevent cascading failures with automatic circuit opening
+✅ **Configurable retry** - Exponential, linear, or fixed backoff strategies
+✅ **Prometheus metrics** - Comprehensive monitoring with `/metrics` endpoint
+✅ **Structured errors** - Error codes with troubleshooting guidance
 ✅ **Easy deployment** - Python plugin, no compilation required
 ✅ **Docker-ready** - Works with `orthancteam/orthanc` images out of the box
 ✅ **Environment variable support** - Secure credential management via `${VAR}` substitution
-✅ **Monitoring endpoints** - REST API for status checks and testing
-✅ **Retry logic** - Automatic retry with exponential backoff for network errors
 
 ## ⚠️ Security Notice
 
@@ -157,6 +159,54 @@ curl http://localhost:8042/dicomweb-oauth/servers
 ```bash
 curl -X POST http://localhost:8042/dicomweb-oauth/servers/my-cloud-dicom/test
 ```
+
+## Resilience Features
+
+The plugin includes advanced resilience patterns:
+
+- **Circuit Breaker**: Prevent cascading failures by opening circuit after threshold
+- **Configurable Retry**: Exponential, linear, or fixed backoff strategies
+- **Metrics**: Prometheus endpoint for monitoring token acquisition and errors
+
+See [RESILIENCE.md](docs/RESILIENCE.md) for configuration details.
+
+### Quick Example
+
+```json
+{
+  "ResilienceConfig": {
+    "CircuitBreakerEnabled": true,
+    "CircuitBreakerFailureThreshold": 5,
+    "CircuitBreakerTimeout": 60,
+    "RetryStrategy": "exponential",
+    "RetryMaxAttempts": 3
+  }
+}
+```
+
+## Prometheus Metrics
+
+Prometheus metrics available at `/dicomweb-oauth/metrics`.
+
+Key metrics:
+- `dicomweb_oauth_token_acquisitions_total{server, status}` - Token acquisition attempts
+- `dicomweb_oauth_token_acquisition_duration_seconds{server}` - Acquisition duration histogram
+- `dicomweb_oauth_cache_hits_total{server}` / `cache_misses_total` - Cache performance
+- `dicomweb_oauth_circuit_breaker_state{server}` - Circuit breaker state
+- `dicomweb_oauth_errors_total{server, error_code, category}` - Error counts
+
+See [METRICS.md](docs/METRICS.md) for complete reference and Grafana examples.
+
+## Error Codes
+
+All errors include structured error codes with troubleshooting steps:
+
+- **CFG-xxx**: Configuration errors
+- **TOK-xxx**: Token acquisition errors
+- **NET-xxx**: Network errors
+- **AUTH-xxx**: Authorization errors
+
+See [ERROR-CODES.md](docs/ERROR-CODES.md) for complete reference.
 
 ## How It Works
 
