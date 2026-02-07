@@ -50,6 +50,16 @@ skips = [
     "B101",  # assert_used (used in tests)
 ]
 
+[tool.pydocstyle]
+convention = "google"
+match = "(?!test_).*\\.py"
+add-ignore = [
+    "D100",  # Don't require module docstrings
+    "D104",  # Don't require package docstrings
+    "D105",  # Don't require docstrings for magic methods
+    "D212",  # Multi-line docstring summary can start on first or second line
+]
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers"

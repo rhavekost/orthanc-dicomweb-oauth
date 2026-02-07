@@ -1,9 +1,10 @@
 """Test docstring coverage for public functions and classes."""
 import ast
 from pathlib import Path
+from typing import List, Tuple
 
 
-def get_docstring_coverage(file_path: Path) -> tuple[int, int, list]:
+def get_docstring_coverage(file_path: Path) -> Tuple[int, int, List[str]]:
     """
     Calculate docstring coverage for a Python file.
 
@@ -37,7 +38,7 @@ def get_docstring_coverage(file_path: Path) -> tuple[int, int, list]:
     return documented, total, missing
 
 
-def test_dicomweb_oauth_plugin_docstring_coverage():
+def test_dicomweb_oauth_plugin_docstring_coverage() -> None:
     """Main plugin file should have >80% docstring coverage."""
     file_path = Path("src/dicomweb_oauth_plugin.py")
     documented, total, missing = get_docstring_coverage(file_path)
@@ -50,7 +51,7 @@ def test_dicomweb_oauth_plugin_docstring_coverage():
     )
 
 
-def test_token_manager_docstring_coverage():
+def test_token_manager_docstring_coverage() -> None:
     """Token manager should have >80% docstring coverage."""
     file_path = Path("src/token_manager.py")
     documented, total, missing = get_docstring_coverage(file_path)
@@ -63,7 +64,7 @@ def test_token_manager_docstring_coverage():
     )
 
 
-def test_config_parser_docstring_coverage():
+def test_config_parser_docstring_coverage() -> None:
     """Config parser should have >80% docstring coverage."""
     file_path = Path("src/config_parser.py")
     documented, total, missing = get_docstring_coverage(file_path)
@@ -76,7 +77,7 @@ def test_config_parser_docstring_coverage():
     )
 
 
-def test_overall_docstring_coverage():
+def test_overall_docstring_coverage() -> None:
     """Overall project should have >77% docstring coverage."""
     src_dir = Path("src")
     total_documented = 0
@@ -93,3 +94,38 @@ def test_overall_docstring_coverage():
     coverage = (total_documented / total_count * 100) if total_count > 0 else 0
 
     assert coverage >= 77, f"Overall docstring coverage is {coverage:.1f}%, need 77%"
+
+
+def test_docstrings_pass_pydocstyle() -> None:
+    """Docstrings should pass pydocstyle with lenient settings."""
+    import subprocess
+
+    # Allow D212 (multi-line summary can start on line 1 or 2)
+    # Allow D105 (magic methods don't need docstrings)
+    # Allow D107 (simple __init__ doesn't need separate docstring)
+    # Allow D102 (simple properties don't need separate docstring)
+    result = subprocess.run(
+        [
+            "pydocstyle",
+            "--convention=google",
+            "--add-ignore=D105,D107,D102,D212",
+            "src/",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    # Only fail on critical issues (D415 - missing punctuation, etc.)
+    if result.returncode != 0:
+        errors = result.stdout.strip()
+        # Filter to only show non-ignored errors
+        error_lines = [
+            line
+            for line in errors.split("\n")
+            if line
+            and not any(code in line for code in ["D105", "D107", "D102", "D212"])
+        ]
+        if error_lines:
+            raise AssertionError(
+                "Critical docstring issues:\n" + "\n".join(error_lines)
+            )

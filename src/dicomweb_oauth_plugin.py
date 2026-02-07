@@ -1,5 +1,5 @@
 """
-Orthanc DICOMweb OAuth2 Plugin
+Orthanc DICOMweb OAuth2 Plugin.
 
 Generic OAuth2/OIDC token management plugin for Orthanc's DICOMweb connections.
 Automatically acquires, caches, and refreshes bearer tokens for any OAuth2-protected
@@ -275,7 +275,7 @@ def handle_rest_api_servers(output: Any, uri: str, **request: Any) -> None:
 
 def handle_rest_api_test_server(output: Any, uri: str, **request: Any) -> None:
     """
-    POST /dicomweb-oauth/servers/{name}/test
+    POST /dicomweb-oauth/servers/{name}/test.
 
     Test token acquisition for a specific server.
     """
