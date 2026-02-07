@@ -8,6 +8,9 @@ env/
 venv/
 ENV/
 .venv/
+*.egg-info/
+dist/
+build/
 
 # Testing
 .pytest_cache/

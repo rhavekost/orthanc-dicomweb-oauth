@@ -148,6 +148,57 @@ class ErrorCode(Enum):
         ),
     )
 
+    TOKEN_VALIDATION_FAILED = ErrorCodeInfo(
+        code="TOK-004",
+        category=ErrorCategory.AUTHENTICATION,
+        severity=ErrorSeverity.ERROR,
+        http_status=401,
+        description="Token validation failed",
+        troubleshooting=[
+            "Verify token signature and claims are valid",
+            "Check that token hasn't been tampered with",
+            "Ensure provider's public keys are accessible",
+        ],
+        documentation_url=(
+            "https://github.com/rhavekost/orthanc-dicomweb-oauth/"
+            "blob/main/docs/TOKEN-MANAGEMENT.md#validation"
+        ),
+    )
+
+    TOKEN_INVALID_RESPONSE = ErrorCodeInfo(
+        code="TOK-005",
+        category=ErrorCategory.AUTHENTICATION,
+        severity=ErrorSeverity.ERROR,
+        http_status=502,
+        description="Invalid response from token endpoint",
+        troubleshooting=[
+            "Check that token endpoint returned valid JSON",
+            "Verify response contains required 'access_token' field",
+            "Review provider documentation for response format",
+        ],
+        documentation_url=(
+            "https://github.com/rhavekost/orthanc-dicomweb-oauth/"
+            "blob/main/docs/OAUTH-PROVIDERS.md"
+        ),
+    )
+
+    TOKEN_REFRESH_FAILED = ErrorCodeInfo(
+        code="TOK-006",
+        category=ErrorCategory.AUTHENTICATION,
+        severity=ErrorSeverity.ERROR,
+        http_status=401,
+        description="Failed to refresh OAuth2 token",
+        troubleshooting=[
+            "Verify refresh token is still valid",
+            "Check that OAuth2 client supports refresh grants",
+            "Ensure refresh token hasn't been revoked",
+        ],
+        documentation_url=(
+            "https://github.com/rhavekost/orthanc-dicomweb-oauth/"
+            "blob/main/docs/TOKEN-MANAGEMENT.md#token-refresh"
+        ),
+    )
+
     # Network Errors (NET-xxx)
     NETWORK_TIMEOUT = ErrorCodeInfo(
         code="NET-001",

@@ -5,10 +5,11 @@ from typing import Any, Dict, Match
 
 from src.config_migration import migrate_config as migrate_config_version
 from src.config_schema import validate_config
+from src.error_codes import ConfigurationError, ErrorCode
 
 
 class ConfigError(Exception):
-    """Raised when configuration is invalid."""
+    """Raised when configuration is invalid (deprecated - use ConfigurationError)."""
 
     pass
 
@@ -36,11 +37,17 @@ class ConfigParser:
             validate_schema: Whether to validate against JSON Schema
         """
         if "DicomWebOAuth" not in self.config:
-            raise ConfigError("Missing 'DicomWebOAuth' section in configuration")
+            raise ConfigurationError(
+                ErrorCode.CONFIG_MISSING_KEY,
+                "Missing 'DicomWebOAuth' section in configuration",
+                details={"missing_key": "DicomWebOAuth"},
+            )
 
         if "Servers" not in self.config["DicomWebOAuth"]:
-            raise ConfigError(
-                "Missing 'Servers' section in DicomWebOAuth configuration"
+            raise ConfigurationError(
+                ErrorCode.CONFIG_MISSING_KEY,
+                "Missing 'Servers' section in DicomWebOAuth configuration",
+                details={"missing_key": "Servers", "parent": "DicomWebOAuth"},
             )
 
         # Validate against JSON Schema if enabled
@@ -48,7 +55,11 @@ class ConfigParser:
             try:
                 validate_config(self.config)
             except Exception as e:
-                raise ConfigError(f"Configuration validation failed: {e}") from e
+                raise ConfigurationError(
+                    ErrorCode.CONFIG_INVALID_VALUE,
+                    f"Configuration validation failed: {e}",
+                    details={"validation_error": str(e)},
+                ) from e
 
     def get_servers(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -106,9 +117,13 @@ class ConfigParser:
         def replace_var(match: Match[str]) -> str:
             var_name = match.group(1)
             if var_name not in os.environ:
-                raise ConfigError(
-                    f"Environment variable '{var_name}' referenced in config "
-                    "but not set"
+                raise ConfigurationError(
+                    ErrorCode.CONFIG_ENV_VAR_MISSING,
+                    (
+                        f"Environment variable '{var_name}' referenced in "
+                        "config but not set"
+                    ),
+                    details={"variable_name": var_name},
                 )
             return os.environ[var_name]
 

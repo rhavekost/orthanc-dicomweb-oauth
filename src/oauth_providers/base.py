@@ -3,14 +3,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from src.error_codes import TokenAcquisitionError
+
 if TYPE_CHECKING:
     from src.http_client import HttpClient
 
-
-class TokenAcquisitionError(Exception):
-    """Raised when token acquisition fails."""
-
-    pass
+# Re-export for backwards compatibility
+__all__ = ["TokenAcquisitionError", "OAuthToken", "OAuthConfig", "OAuthProvider"]
 
 
 @dataclass

@@ -1,6 +1,7 @@
 """Generic OAuth2 client credentials provider."""
 import requests
 
+from src.error_codes import ErrorCode, NetworkError
 from src.oauth_providers.base import OAuthProvider, OAuthToken, TokenAcquisitionError
 
 # Token configuration constants (shared with token_manager)
@@ -46,7 +47,12 @@ class GenericOAuth2Provider(OAuthProvider):
 
             if not token_data or "access_token" not in token_data:
                 raise TokenAcquisitionError(
-                    "Invalid token response: missing access_token"
+                    ErrorCode.TOKEN_INVALID_RESPONSE,
+                    "Invalid token response: missing access_token",
+                    details={
+                        "endpoint": self.config.token_endpoint,
+                        "response": token_data,
+                    },
                 )
 
             return OAuthToken(
@@ -57,8 +63,27 @@ class GenericOAuth2Provider(OAuthProvider):
                 scope=token_data.get("scope"),
             )
 
+        except requests.Timeout as e:
+            raise NetworkError(
+                ErrorCode.NETWORK_TIMEOUT,
+                f"Connection timeout to token endpoint: {e}",
+                details={
+                    "endpoint": self.config.token_endpoint,
+                    "timeout_seconds": TOKEN_REQUEST_TIMEOUT_SECONDS,
+                },
+            ) from e
+        except requests.ConnectionError as e:
+            raise NetworkError(
+                ErrorCode.NETWORK_CONNECTION_ERROR,
+                f"Connection failed to token endpoint: {e}",
+                details={"endpoint": self.config.token_endpoint},
+            ) from e
         except requests.RequestException as e:
-            raise TokenAcquisitionError(f"Failed to acquire token: {e}") from e
+            raise TokenAcquisitionError(
+                ErrorCode.TOKEN_ACQUISITION_FAILED,
+                f"Failed to acquire token: {e}",
+                details={"endpoint": self.config.token_endpoint, "error": str(e)},
+            ) from e
 
     def validate_token(self, token: str) -> bool:
         """Generic provider doesn't validate tokens."""
@@ -88,7 +113,13 @@ class GenericOAuth2Provider(OAuthProvider):
 
             if not token_data or "access_token" not in token_data:
                 raise TokenAcquisitionError(
-                    "Invalid token response: missing access_token"
+                    ErrorCode.TOKEN_INVALID_RESPONSE,
+                    "Invalid token response: missing access_token",
+                    details={
+                        "endpoint": self.config.token_endpoint,
+                        "operation": "refresh",
+                        "response": token_data,
+                    },
                 )
 
             return OAuthToken(
@@ -99,5 +130,28 @@ class GenericOAuth2Provider(OAuthProvider):
                 scope=token_data.get("scope"),
             )
 
+        except requests.Timeout as e:
+            raise NetworkError(
+                ErrorCode.NETWORK_TIMEOUT,
+                f"Connection timeout to token endpoint during refresh: {e}",
+                details={
+                    "endpoint": self.config.token_endpoint,
+                    "timeout_seconds": TOKEN_REQUEST_TIMEOUT_SECONDS,
+                    "operation": "refresh",
+                },
+            ) from e
+        except requests.ConnectionError as e:
+            raise NetworkError(
+                ErrorCode.NETWORK_CONNECTION_ERROR,
+                f"Connection failed to token endpoint during refresh: {e}",
+                details={
+                    "endpoint": self.config.token_endpoint,
+                    "operation": "refresh",
+                },
+            ) from e
         except requests.RequestException as e:
-            raise TokenAcquisitionError(f"Failed to refresh token: {e}") from e
+            raise TokenAcquisitionError(
+                ErrorCode.TOKEN_REFRESH_FAILED,
+                f"Failed to refresh token: {e}",
+                details={"endpoint": self.config.token_endpoint, "error": str(e)},
+            ) from e

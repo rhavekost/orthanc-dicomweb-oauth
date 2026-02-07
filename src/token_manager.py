@@ -7,7 +7,8 @@ from typing import Any, Dict, Optional, cast
 
 import requests
 
-from src.oauth_providers.base import OAuthProvider, TokenAcquisitionError
+from src.error_codes import ErrorCode, NetworkError, TokenAcquisitionError
+from src.oauth_providers.base import OAuthProvider
 from src.oauth_providers.factory import OAuthProviderFactory
 from src.resilience.circuit_breaker import CircuitBreaker
 from src.resilience.retry_strategy import (
@@ -248,7 +249,14 @@ class TokenManager:
 
             # Validate token if provider supports it
             if not self.provider.validate_token(oauth_token.access_token):
-                raise TokenAcquisitionError("Token validation failed")
+                raise TokenAcquisitionError(
+                    ErrorCode.TOKEN_VALIDATION_FAILED,
+                    "Token validation failed",
+                    details={
+                        "server": self.server_name,
+                        "provider": self.provider.provider_name,
+                    },
+                )
 
             structured_logger.info(
                 "Token acquired and validated",
@@ -266,6 +274,9 @@ class TokenManager:
 
         try:
             return cast(str, self._retry_config.execute(attempt_acquire))
+        except (TokenAcquisitionError, NetworkError):
+            # Re-raise structured errors as-is (they already have error codes)
+            raise
         except Exception as e:
             error_msg = f"Failed to acquire token for server '{self.server_name}': {e}"
             structured_logger.error(
@@ -277,7 +288,15 @@ class TokenManager:
                 error_message=str(e),
             )
             logger.error(error_msg)
-            raise TokenAcquisitionError(error_msg) from e
+            raise TokenAcquisitionError(
+                ErrorCode.TOKEN_ACQUISITION_FAILED,
+                error_msg,
+                details={
+                    "server": self.server_name,
+                    "provider": self.provider.provider_name,
+                    "original_error": str(e),
+                },
+            ) from e
 
     def _acquire_with_legacy_retry(self) -> str:
         """Legacy token acquisition with hardcoded exponential backoff."""
@@ -296,7 +315,15 @@ class TokenManager:
 
                 # Validate token if provider supports it
                 if not self.provider.validate_token(oauth_token.access_token):
-                    raise TokenAcquisitionError("Token validation failed")
+                    raise TokenAcquisitionError(
+                        ErrorCode.TOKEN_VALIDATION_FAILED,
+                        "Token validation failed",
+                        details={
+                            "server": self.server_name,
+                            "provider": self.provider.provider_name,
+                            "attempt": attempt + 1,
+                        },
+                    )
 
                 structured_logger.info(
                     "Token acquired and validated",
@@ -313,7 +340,7 @@ class TokenManager:
 
                 return self._cached_token
 
-            except (requests.Timeout, requests.ConnectionError) as e:
+            except (requests.Timeout, requests.ConnectionError, NetworkError) as e:
                 if attempt < max_retries - 1:
                     structured_logger.warning(
                         "Token acquisition retry",
@@ -349,10 +376,19 @@ class TokenManager:
                         max_attempts=max_retries,
                     )
                     logger.error(error_msg)
-                    raise TokenAcquisitionError(error_msg) from e
+                    raise TokenAcquisitionError(
+                        ErrorCode.TOKEN_ACQUISITION_FAILED,
+                        error_msg,
+                        details={
+                            "server": self.server_name,
+                            "provider": self.provider.provider_name,
+                            "attempts": max_retries,
+                            "error_type": type(e).__name__,
+                        },
+                    ) from e
 
-            except TokenAcquisitionError:
-                # Provider-specific errors, re-raise immediately
+            except (TokenAcquisitionError, NetworkError):
+                # Provider-specific errors with error codes, re-raise immediately
                 raise
 
             except Exception as e:
@@ -370,9 +406,19 @@ class TokenManager:
                     retryable=False,
                 )
                 logger.error(error_msg)
-                raise TokenAcquisitionError(error_msg) from e
+                raise TokenAcquisitionError(
+                    ErrorCode.TOKEN_ACQUISITION_FAILED,
+                    error_msg,
+                    details={
+                        "server": self.server_name,
+                        "provider": self.provider.provider_name,
+                        "error_type": type(e).__name__,
+                    },
+                ) from e
 
         # This should never be reached, but satisfies mypy
         raise TokenAcquisitionError(
-            f"Failed to acquire token for server '{self.server_name}'"
+            ErrorCode.TOKEN_ACQUISITION_FAILED,
+            f"Failed to acquire token for server '{self.server_name}'",
+            details={"server": self.server_name},
         )
