@@ -2,6 +2,41 @@
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to this project.
 
+## Contributor License Agreement (CLA)
+
+### Do I Need to Sign?
+
+**Currently optional.** We have a CLA available but are not requiring it yet. We may require it in the future for:
+- Patent protection
+- License flexibility
+- Corporate contributions
+
+### How to Sign
+
+If you choose to sign the CLA now (recommended for regular contributors):
+
+1. Read the [CLA](CLA.md)
+2. Add this to your PR description:
+   ```
+   I agree to the terms of the Contributor License Agreement (CLA.md).
+   ```
+3. Add your name to the [CLA signatories list](CLA.md#cla-signatories)
+
+### What the CLA Means
+
+- ✅ You keep ownership of your contributions
+- ✅ You grant the Project permission to use your contributions
+- ✅ You confirm you have the right to contribute
+- ✅ You provide patent protection to users
+
+**It's friendly!** Read it at [CLA.md](CLA.md) - we've written it in plain English.
+
+### Questions About the CLA?
+
+Open an issue and we'll clarify. We want contributing to be easy, not scary.
+
+---
+
 ## Code of Conduct
 
 This project adheres to a code of professional conduct. By participating, you agree to:
