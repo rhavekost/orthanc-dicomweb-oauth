@@ -18,29 +18,36 @@ except ImportError:
     orthanc = None
 
 from src.config_parser import ConfigError, ConfigParser
+from src.plugin_context import PluginContext
 from src.token_manager import TokenAcquisitionError, TokenManager
 
 # Plugin version
 __version__ = "1.0.0"
 
-# Global state
-_token_managers: Dict[str, TokenManager] = {}
-_server_urls: Dict[str, str] = {}
+# Global context instance
+_plugin_context: Optional[PluginContext] = None
 
 logger = logging.getLogger(__name__)
 
 
-def initialize_plugin(orthanc_module=None):
+def initialize_plugin(orthanc_module=None, context: Optional[PluginContext] = None):
     """
     Initialize the DICOMweb OAuth plugin.
 
     Args:
         orthanc_module: Orthanc module (for testing, defaults to global orthanc)
+        context: Plugin context (for testing, creates new if None)
     """
-    global _token_managers, _server_urls
+    global _plugin_context
 
     if orthanc_module is None:
         orthanc_module = orthanc
+
+    # Create or use provided context (allows dependency injection in tests)
+    if context is None:
+        context = PluginContext()
+
+    _plugin_context = context
 
     logger.info("Initializing DICOMweb OAuth plugin")
 
@@ -54,8 +61,10 @@ def initialize_plugin(orthanc_module=None):
         for server_name, server_config in servers.items():
             logger.info(f"Configuring OAuth for server: {server_name}")
 
-            _token_managers[server_name] = TokenManager(server_name, server_config)
-            _server_urls[server_name] = server_config["Url"]
+            manager = TokenManager(server_name, server_config)
+            context.register_token_manager(
+                server_name=server_name, manager=manager, url=server_config["Url"]
+            )
 
             logger.info(
                 f"Server '{server_name}' configured with URL: {server_config['Url']}"
@@ -71,13 +80,20 @@ def initialize_plugin(orthanc_module=None):
         raise
 
 
+def get_plugin_context() -> PluginContext:
+    """Get the plugin context (for use in callbacks)."""
+    if _plugin_context is None:
+        raise RuntimeError("Plugin not initialized")
+    return _plugin_context
+
+
 def on_outgoing_http_request(
     uri: str,
     method: str,
     headers: Dict[str, str],
     get_params: Dict[str, str],
     body: bytes,
-) -> Dict:
+) -> Optional[Dict]:
     """
     Orthanc HTTP filter callback - injects OAuth2 bearer tokens.
 
@@ -95,10 +111,10 @@ def on_outgoing_http_request(
     Returns:
         Modified request dict or None to allow request
     """
-    global _token_managers, _server_urls
+    context = get_plugin_context()
 
     # Find which server this request is for
-    server_name = _find_server_for_uri(uri)
+    server_name = context.find_server_for_uri(uri)
 
     if server_name is None:
         # Not a configured OAuth server, let it pass through
@@ -108,7 +124,11 @@ def on_outgoing_http_request(
 
     try:
         # Get valid token
-        token_manager = _token_managers[server_name]
+        token_manager = context.get_token_manager(server_name)
+        if token_manager is None:
+            logger.error(f"No token manager for server '{server_name}'")
+            return None
+
         token = token_manager.get_token()
 
         # Inject Authorization header
@@ -138,39 +158,20 @@ def on_outgoing_http_request(
         }
 
 
-def _find_server_for_uri(uri: str) -> Optional[str]:
-    """
-    Find which configured server a URI belongs to.
-
-    Args:
-        uri: Request URI
-
-    Returns:
-        Server name if URI matches a configured server, None otherwise
-    """
-    global _server_urls
-
-    for server_name, server_url in _server_urls.items():
-        if uri.startswith(server_url):
-            return server_name
-
-    return None
-
-
 def handle_rest_api_status(output, uri, **request) -> None:
     """
     GET /dicomweb-oauth/status
 
     Returns plugin status and configuration summary.
     """
-    global _token_managers
+    context = get_plugin_context()
 
     status = {
         "plugin": "DICOMweb OAuth",
         "version": __version__,
         "status": "active",
-        "configured_servers": len(_token_managers),
-        "servers": list(_token_managers.keys()),
+        "configured_servers": len(context.token_managers),
+        "servers": list(context.token_managers.keys()),
     }
 
     output.AnswerBuffer(json.dumps(status, indent=2), "application/json")
@@ -182,15 +183,13 @@ def handle_rest_api_servers(output, uri, **request) -> None:
 
     Returns list of configured servers and their status.
     """
-    global _token_managers, _server_urls
+    context = get_plugin_context()
 
     servers = []
-    for server_name in _token_managers.keys():
-        token_manager = _token_managers[server_name]
-
+    for server_name, token_manager in context.token_managers.items():
         server_info = {
             "name": server_name,
-            "url": _server_urls[server_name],
+            "url": context.get_server_url(server_name),
             "token_endpoint": token_manager.token_endpoint,
             "has_cached_token": token_manager._cached_token is not None,
             "token_valid": token_manager._is_token_valid()
@@ -208,7 +207,7 @@ def handle_rest_api_test_server(output, uri, **request) -> None:
 
     Test token acquisition for a specific server.
     """
-    global _token_managers
+    context = get_plugin_context()
 
     # Extract server name from URI
     parts = uri.split("/")
@@ -222,7 +221,7 @@ def handle_rest_api_test_server(output, uri, **request) -> None:
 
     server_name = parts[-2]
 
-    if server_name not in _token_managers:
+    if server_name not in context.token_managers:
         output.AnswerBuffer(
             json.dumps({"error": f"Server '{server_name}' not configured"}),
             "application/json",
@@ -231,7 +230,15 @@ def handle_rest_api_test_server(output, uri, **request) -> None:
         return
 
     try:
-        token_manager = _token_managers[server_name]
+        token_manager = context.get_token_manager(server_name)
+        if token_manager is None:
+            output.AnswerBuffer(
+                json.dumps({"error": f"Server '{server_name}' not configured"}),
+                "application/json",
+                status=404,
+            )
+            return
+
         token = token_manager.get_token()
 
         result = {

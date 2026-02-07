@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import responses
 
 from src.dicomweb_oauth_plugin import (
+    get_plugin_context,
     handle_rest_api_servers,
     handle_rest_api_status,
     handle_rest_api_test_server,
@@ -69,9 +70,8 @@ def test_servers_endpoint():
     initialize_plugin(mock_orthanc)
 
     # Acquire token first
-    from src.dicomweb_oauth_plugin import _token_managers
-
-    _token_managers["test-server"].get_token()
+    context = get_plugin_context()
+    context.token_managers["test-server"].get_token()
 
     # Call servers endpoint
     output = Mock()

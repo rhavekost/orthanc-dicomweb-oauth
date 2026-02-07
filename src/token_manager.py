@@ -7,13 +7,11 @@ from typing import Any, Dict, Optional
 
 import requests
 
+from src.oauth_providers.base import OAuthProvider, TokenAcquisitionError
+from src.oauth_providers.factory import OAuthProviderFactory
+from src.structured_logger import structured_logger
+
 logger = logging.getLogger(__name__)
-
-
-class TokenAcquisitionError(Exception):
-    """Raised when token acquisition fails."""
-
-    pass
 
 
 class TokenManager:
@@ -44,6 +42,21 @@ class TokenManager:
         self.refresh_buffer_seconds = config.get("TokenRefreshBufferSeconds", 300)
         self.verify_ssl = config.get("VerifySSL", True)
 
+        # Create OAuth provider
+        provider_type = config.get("ProviderType", "auto")
+        if provider_type == "auto":
+            provider_type = OAuthProviderFactory.auto_detect(config)
+
+        self.provider: OAuthProvider = OAuthProviderFactory.create(
+            provider_type=provider_type, config=config
+        )
+
+        structured_logger.info(
+            "Token manager initialized",
+            server=server_name,
+            provider=self.provider.provider_name,
+        )
+
     def _validate_config(self) -> None:
         """Validate that required configuration keys are present."""
         required_keys = ["TokenEndpoint", "ClientId", "ClientSecret"]
@@ -68,10 +81,22 @@ class TokenManager:
         with self._lock:
             # Check if we have a valid cached token
             if self._is_token_valid():
+                structured_logger.debug(
+                    "Using cached token",
+                    server=self.server_name,
+                    operation="get_token",
+                    cached=True,
+                )
                 logger.debug(f"Using cached token for server '{self.server_name}'")
                 return self._cached_token
 
             # Need to acquire a new token
+            structured_logger.info(
+                "Acquiring new token",
+                server=self.server_name,
+                operation="get_token",
+                cached=False,
+            )
             logger.info(f"Acquiring new token for server '{self.server_name}'")
             return self._acquire_token()
 
@@ -87,7 +112,7 @@ class TokenManager:
 
     def _acquire_token(self) -> str:
         """
-        Acquire a new OAuth2 token via client credentials flow with retry logic.
+        Acquire a new OAuth2 token using provider with retry logic.
 
         Returns:
             Access token string
@@ -95,45 +120,59 @@ class TokenManager:
         Raises:
             TokenAcquisitionError: If acquisition fails after all retries
         """
-        data = {
-            "grant_type": "client_credentials",
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-        }
-
-        if self.scope:
-            data["scope"] = self.scope
+        structured_logger.info(
+            "Starting token acquisition",
+            server=self.server_name,
+            operation="acquire_token",
+            provider=self.provider.provider_name,
+            endpoint=self.token_endpoint,
+        )
 
         max_retries = 3
         retry_delay = 1  # seconds
 
         for attempt in range(max_retries):
             try:
-                response = requests.post(
-                    self.token_endpoint,
-                    data=data,
-                    headers={"Content-Type": "application/x-www-form-urlencoded"},
-                    timeout=30,
-                    verify=self.verify_ssl,  # Explicit SSL verification
-                )
-                response.raise_for_status()
+                # Use provider to acquire token
+                oauth_token = self.provider.acquire_token()
 
-                token_data = response.json()
-                self._cached_token = token_data["access_token"]
-                expires_in = token_data.get("expires_in", 3600)
+                self._cached_token = oauth_token.access_token
                 self._token_expiry = datetime.now(timezone.utc) + timedelta(
-                    seconds=expires_in
+                    seconds=oauth_token.expires_in
                 )
 
+                # Validate token if provider supports it
+                if not self.provider.validate_token(oauth_token.access_token):
+                    raise TokenAcquisitionError("Token validation failed")
+
+                structured_logger.info(
+                    "Token acquired and validated",
+                    server=self.server_name,
+                    operation="acquire_token",
+                    provider=self.provider.provider_name,
+                    expires_in_seconds=oauth_token.expires_in,
+                    attempt=attempt + 1,
+                )
                 logger.info(
                     f"Token acquired for server '{self.server_name}', "
-                    f"expires in {expires_in} seconds"
+                    f"expires in {oauth_token.expires_in} seconds"
                 )
 
                 return self._cached_token
 
             except (requests.Timeout, requests.ConnectionError) as e:
                 if attempt < max_retries - 1:
+                    structured_logger.warning(
+                        "Token acquisition retry",
+                        server=self.server_name,
+                        operation="acquire_token",
+                        provider=self.provider.provider_name,
+                        attempt=attempt + 1,
+                        max_attempts=max_retries,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        retry_delay_seconds=retry_delay,
+                    )
                     logger.warning(
                         f"Token acquisition attempt {attempt + 1} failed for "
                         f"server '{self.server_name}': {e}. "
@@ -147,20 +186,35 @@ class TokenManager:
                         f"Failed to acquire token for server '{self.server_name}' "
                         f"after {max_retries} attempts: {e}"
                     )
+                    structured_logger.error(
+                        "Token acquisition failed",
+                        server=self.server_name,
+                        operation="acquire_token",
+                        provider=self.provider.provider_name,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        max_attempts=max_retries,
+                    )
                     logger.error(error_msg)
                     raise TokenAcquisitionError(error_msg) from e
 
-            except requests.RequestException as e:
-                # Non-retryable errors (4xx, 5xx)
+            except TokenAcquisitionError:
+                # Provider-specific errors, re-raise immediately
+                raise
+
+            except Exception as e:
+                # Unexpected errors
                 error_msg = (
                     f"Failed to acquire token for server '{self.server_name}': {e}"
                 )
-                logger.error(error_msg)
-                raise TokenAcquisitionError(error_msg) from e
-
-            except (KeyError, ValueError) as e:
-                error_msg = (
-                    f"Invalid token response for server '{self.server_name}': {e}"
+                structured_logger.error(
+                    "Token acquisition failed",
+                    server=self.server_name,
+                    operation="acquire_token",
+                    provider=self.provider.provider_name,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    retryable=False,
                 )
                 logger.error(error_msg)
                 raise TokenAcquisitionError(error_msg) from e
