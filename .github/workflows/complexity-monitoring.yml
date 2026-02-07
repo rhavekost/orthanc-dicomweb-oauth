@@ -1,0 +1,65 @@
+name: Complexity Monitoring
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  complexity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comparison
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install radon
+        run: pip install radon
+
+      - name: Check current complexity
+        id: current
+        run: |
+          echo "average=$(radon cc src/ -a --total-average | grep 'Average complexity' | awk '{print $3}')" >> $GITHUB_OUTPUT
+
+      - name: Check baseline (main branch)
+        if: github.event_name == 'pull_request'
+        run: |
+          git checkout origin/main
+          BASELINE=$(radon cc src/ -a --total-average | grep 'Average complexity' | awk '{print $3}')
+          echo "Baseline complexity: $BASELINE"
+          echo "baseline=$BASELINE" >> $GITHUB_ENV
+
+      - name: Compare complexity
+        if: github.event_name == 'pull_request'
+        run: |
+          CURRENT=${{ steps.current.outputs.average }}
+          BASELINE=${{ env.baseline }}
+
+          # Fail if complexity increased by more than 0.5
+          python -c "
+          import sys
+          current = float('$CURRENT'.strip('()'))
+          baseline = float('$BASELINE'.strip('()'))
+          increase = current - baseline
+
+          print(f'Current: {current}, Baseline: {baseline}, Increase: {increase}')
+
+          if increase > 0.5:
+              print(f'❌ Complexity increased by {increase:.2f} (threshold: 0.5)')
+              sys.exit(1)
+          else:
+              print(f'✅ Complexity acceptable (change: {increase:+.2f})')
+          "
+
+      - name: Report complexity
+        run: |
+          echo "## Complexity Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Current Average:** ${{ steps.current.outputs.average }}" >> $GITHUB_STEP_SUMMARY
+          radon cc src/ -s >> $GITHUB_STEP_SUMMARY
