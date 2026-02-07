@@ -322,6 +322,13 @@ class TokenManager:
 
             # Validate token if provider supports it
             if not self.provider.validate_token(oauth_token.access_token):
+                # Log security event for validation failure
+                structured_logger.security_event(
+                    event_type="token_validation_failure",
+                    server=self.server_name,
+                    provider=self.provider.provider_name,
+                )
+
                 raise TokenAcquisitionError(
                     ErrorCode.TOKEN_VALIDATION_FAILED,
                     "Token validation failed",
@@ -330,6 +337,14 @@ class TokenManager:
                         "provider": self.provider.provider_name,
                     },
                 )
+
+            # Log successful authentication
+            structured_logger.security_event(
+                event_type="auth_success",
+                server=self.server_name,
+                provider=self.provider.provider_name,
+                expires_in_seconds=oauth_token.expires_in,
+            )
 
             structured_logger.info(
                 "Token acquired and validated",
@@ -354,6 +369,16 @@ class TokenManager:
             raise
         except Exception as e:
             error_msg = f"Failed to acquire token for server '{self.server_name}': {e}"
+
+            # Log security event for auth failure
+            structured_logger.security_event(
+                event_type="auth_failure",
+                server=self.server_name,
+                provider=self.provider.provider_name,
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
+
             structured_logger.error(
                 "Token acquisition failed",
                 server=self.server_name,
@@ -391,6 +416,14 @@ class TokenManager:
 
                 # Validate token if provider supports it
                 if not self.provider.validate_token(oauth_token.access_token):
+                    # Log security event for validation failure
+                    structured_logger.security_event(
+                        event_type="token_validation_failure",
+                        server=self.server_name,
+                        provider=self.provider.provider_name,
+                        attempt=attempt + 1,
+                    )
+
                     raise TokenAcquisitionError(
                         ErrorCode.TOKEN_VALIDATION_FAILED,
                         "Token validation failed",
@@ -400,6 +433,15 @@ class TokenManager:
                             "attempt": attempt + 1,
                         },
                     )
+
+                # Log successful authentication
+                structured_logger.security_event(
+                    event_type="auth_success",
+                    server=self.server_name,
+                    provider=self.provider.provider_name,
+                    expires_in_seconds=oauth_token.expires_in,
+                    attempt=attempt + 1,
+                )
 
                 structured_logger.info(
                     "Token acquired and validated",
@@ -444,6 +486,17 @@ class TokenManager:
                         f"Failed to acquire token for server '{self.server_name}' "
                         f"after {max_retries} attempts: {e}"
                     )
+
+                    # Log security event for auth failure
+                    structured_logger.security_event(
+                        event_type="auth_failure",
+                        server=self.server_name,
+                        provider=self.provider.provider_name,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        max_attempts=max_retries,
+                    )
+
                     structured_logger.error(
                         "Token acquisition failed",
                         server=self.server_name,
@@ -474,6 +527,17 @@ class TokenManager:
                 error_msg = (
                     f"Failed to acquire token for server '{self.server_name}': {e}"
                 )
+
+                # Log security event for auth failure
+                structured_logger.security_event(
+                    event_type="auth_failure",
+                    server=self.server_name,
+                    provider=self.provider.provider_name,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    retryable=False,
+                )
+
                 structured_logger.error(
                     "Token acquisition failed",
                     server=self.server_name,
