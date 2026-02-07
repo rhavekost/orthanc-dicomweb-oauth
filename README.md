@@ -132,6 +132,60 @@ Use `${VAR_NAME}` syntax in configuration for secure credential management:
 }
 ```
 
+## Security
+
+### JWT Signature Validation
+
+Validate access tokens to prevent tampering:
+
+```json
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "my-server": {
+        "Url": "https://dicom.example.com",
+        "TokenEndpoint": "https://auth.example.com/token",
+        "ClientId": "my-client-id",
+        "ClientSecret": "my-secret",
+        "JWTPublicKey": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+        "JWTAudience": "https://api.example.com",
+        "JWTIssuer": "https://auth.example.com"
+      }
+    }
+  }
+}
+```
+
+See [docs/security/JWT-VALIDATION.md](docs/security/JWT-VALIDATION.md) for details.
+
+### Rate Limiting
+
+Prevent abuse with rate limiting:
+
+```json
+{
+  "DicomWebOAuth": {
+    "RateLimitRequests": 10,
+    "RateLimitWindowSeconds": 60,
+    "Servers": { ... }
+  }
+}
+```
+
+See [docs/security/RATE-LIMITING.md](docs/security/RATE-LIMITING.md) for details.
+
+### Secrets Encryption
+
+Secrets are automatically encrypted in memory. See [docs/security/SECRETS-ENCRYPTION.md](docs/security/SECRETS-ENCRYPTION.md) for details.
+
+### Security Logging
+
+Security events are automatically logged:
+- Authentication failures
+- Token validation failures
+- Rate limit violations
+- SSL/TLS failures
+
 ## Provider-Specific Guides
 
 - [Azure Health Data Services](docs/quickstart-azure.md)
