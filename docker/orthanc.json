@@ -1,5 +1,5 @@
 {
-  "Name": "Orthanc DICOMweb OAuth Development",
+  "Name": "Orthanc DICOMweb OAuth - DEVELOPMENT (INSECURE)",
   "HttpPort": 8042,
   "DicomPort": 4242,
 

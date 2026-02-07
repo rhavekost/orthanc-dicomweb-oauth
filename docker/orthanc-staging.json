@@ -1,0 +1,51 @@
+{
+  "Name": "Orthanc DICOMweb OAuth - STAGING Environment",
+  "HttpPort": 8042,
+  "DicomPort": 4242,
+
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": true,
+  "RegisteredUsers": {
+    "orthanc-staging": "${STAGING_ORTHANC_PASSWORD}"
+  },
+
+  "Plugins": [
+    "/etc/orthanc/plugins/dicomweb_oauth_plugin.py"
+  ],
+
+  "DicomWeb": {
+    "Enable": true,
+    "Root": "/dicom-web/",
+    "EnableWado": true,
+    "WadoRoot": "/wado",
+    "Ssl": true,
+    "QidoCaseSensitive": false,
+    "Host": "0.0.0.0",
+    "Port": 8042
+  },
+
+  "DicomWebOAuth": {
+    "Servers": {
+      "staging-server": {
+        "Url": "${STAGING_DICOM_URL}",
+        "TokenEndpoint": "${STAGING_TOKEN_ENDPOINT}",
+        "ClientId": "${STAGING_OAUTH_CLIENT_ID}",
+        "ClientSecret": "${STAGING_OAUTH_CLIENT_SECRET}",
+        "Scope": "${STAGING_OAUTH_SCOPE}",
+        "TokenRefreshBufferSeconds": 300,
+        "VerifySSL": true
+      }
+    },
+    "LogLevel": "INFO",
+    "EnableMetrics": true
+  },
+
+  "Verbosity": "default",
+  "LogLevel": "default",
+
+  "_comments": {
+    "environment": "STAGING - Pre-production testing environment",
+    "security": "Authentication and SSL verification REQUIRED",
+    "purpose": "Integration testing with production-like OAuth providers"
+  }
+}

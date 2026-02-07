@@ -24,6 +24,28 @@ services:
       retries: 3
       start_period: 10s
 
+  orthanc-staging:
+    image: orthancteam/orthanc:latest
+    container_name: orthanc-dicomweb-oauth-staging
+    profiles:
+      - staging
+    ports:
+      - "8043:8042"  # Different port than dev
+      - "4243:4242"
+    volumes:
+      - ../src:/etc/orthanc/plugins:ro
+      - ./orthanc-staging.json:/etc/orthanc/orthanc.json:ro
+      - orthanc-staging-db:/var/lib/orthanc/db
+    environment:
+      - STAGING_ORTHANC_PASSWORD=${STAGING_ORTHANC_PASSWORD}
+      - STAGING_DICOM_URL=${STAGING_DICOM_URL}
+      - STAGING_TOKEN_ENDPOINT=${STAGING_TOKEN_ENDPOINT}
+      - STAGING_OAUTH_CLIENT_ID=${STAGING_OAUTH_CLIENT_ID}
+      - STAGING_OAUTH_CLIENT_SECRET=${STAGING_OAUTH_CLIENT_SECRET}
+      - STAGING_OAUTH_SCOPE=${STAGING_OAUTH_SCOPE}
+    restart: unless-stopped
+
 volumes:
   orthanc-storage:
     driver: local
+  orthanc-staging-db:
