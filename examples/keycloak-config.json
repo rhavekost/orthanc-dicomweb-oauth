@@ -1,0 +1,14 @@
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "keycloak-dicom": {
+        "Url": "https://dicom.example.com/dicom-web/",
+        "TokenEndpoint": "https://keycloak.example.com/realms/healthcare/protocol/openid-connect/token",
+        "ClientId": "${KEYCLOAK_CLIENT_ID}",
+        "ClientSecret": "${KEYCLOAK_CLIENT_SECRET}",
+        "Scope": "dicomweb",
+        "TokenRefreshBufferSeconds": 300
+      }
+    }
+  }
+}

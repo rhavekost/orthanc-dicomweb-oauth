@@ -1,0 +1,39 @@
+{
+  "Name": "Orthanc DICOMweb OAuth Development",
+  "HttpPort": 8042,
+  "DicomPort": 4242,
+
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": false,
+
+  "Plugins": [
+    "/etc/orthanc/plugins/dicomweb_oauth_plugin.py"
+  ],
+
+  "DicomWeb": {
+    "Enable": true,
+    "Root": "/dicom-web/",
+    "EnableWado": true,
+    "WadoRoot": "/wado",
+    "Ssl": false,
+    "QidoCaseSensitive": false,
+    "Host": "0.0.0.0",
+    "Port": 8042
+  },
+
+  "DicomWebOAuth": {
+    "Servers": {
+      "example-server": {
+        "Url": "https://dicom.example.com/v2/",
+        "TokenEndpoint": "https://login.example.com/oauth2/token",
+        "ClientId": "${OAUTH_CLIENT_ID}",
+        "ClientSecret": "${OAUTH_CLIENT_SECRET}",
+        "Scope": "https://dicom.example.com/.default",
+        "TokenRefreshBufferSeconds": 300
+      }
+    }
+  },
+
+  "Verbosity": "verbose",
+  "LogLevel": "default"
+}

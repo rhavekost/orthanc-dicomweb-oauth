@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  orthanc:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8042:8042"  # HTTP
+      - "4242:4242"  # DICOM
+    environment:
+      # Override with your OAuth credentials
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-your_client_id}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-your_client_secret}
+    volumes:
+      # Mount source for development (hot reload)
+      - ../src:/etc/orthanc/plugins:ro
+      - orthanc-storage:/var/lib/orthanc/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8042/system"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  orthanc-storage:
+    driver: local

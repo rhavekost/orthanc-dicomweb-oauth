@@ -1,0 +1,14 @@
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "azure-dicom": {
+        "Url": "https://workspace-dicom.dicom.azurehealthcareapis.com/v2/",
+        "TokenEndpoint": "https://login.microsoftonline.com/{tenant-id}/oauth2/v2.0/token",
+        "ClientId": "${AZURE_CLIENT_ID}",
+        "ClientSecret": "${AZURE_CLIENT_SECRET}",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
+        "TokenRefreshBufferSeconds": 300
+      }
+    }
+  }
+}
