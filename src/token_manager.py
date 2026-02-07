@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional, cast
 import requests
 
 from src.error_codes import ErrorCode, NetworkError, TokenAcquisitionError
+from src.metrics import MetricsCollector
 from src.oauth_providers.base import OAuthProvider
 from src.oauth_providers.factory import OAuthProviderFactory
 from src.resilience.circuit_breaker import CircuitBreaker
@@ -170,9 +171,14 @@ class TokenManager:
         Raises:
             TokenAcquisitionError: If token acquisition fails
         """
+        metrics = MetricsCollector.get_instance()
+
         with self._lock:
             # Check if we have a valid cached token
             if self._is_token_valid():
+                # Record cache hit
+                metrics.record_cache_hit(self.server_name)
+
                 structured_logger.debug(
                     "Using cached token",
                     server=self.server_name,
@@ -182,6 +188,9 @@ class TokenManager:
                 logger.debug(f"Using cached token for server '{self.server_name}'")
                 assert self._cached_token is not None  # Validated by _is_token_valid
                 return self._cached_token
+
+            # Record cache miss
+            metrics.record_cache_miss(self.server_name)
 
             # Need to acquire a new token
             structured_logger.info(
@@ -213,6 +222,9 @@ class TokenManager:
         Raises:
             TokenAcquisitionError: If acquisition fails after all retries
         """
+        metrics = MetricsCollector.get_instance()
+        start_time = time.time()
+
         structured_logger.info(
             "Starting token acquisition",
             server=self.server_name,
@@ -229,11 +241,27 @@ class TokenManager:
             else:
                 return self._acquire_with_legacy_retry()
 
-        # Apply circuit breaker if enabled
-        if self._circuit_breaker:
-            return cast(str, self._circuit_breaker.call(acquire_operation))
-        else:
-            return acquire_operation()
+        try:
+            # Apply circuit breaker if enabled
+            if self._circuit_breaker:
+                result = cast(str, self._circuit_breaker.call(acquire_operation))
+            else:
+                result = acquire_operation()
+
+            # Record successful acquisition
+            duration = time.time() - start_time
+            metrics.record_token_acquisition(
+                self.server_name, success=True, duration=duration
+            )
+
+            return result
+        except Exception:
+            # Record failed acquisition
+            duration = time.time() - start_time
+            metrics.record_token_acquisition(
+                self.server_name, success=False, duration=duration
+            )
+            raise
 
     def _acquire_with_retry_config(self) -> str:
         """Acquire token using configured retry strategy."""
