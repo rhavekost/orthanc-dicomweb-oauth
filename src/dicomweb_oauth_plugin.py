@@ -7,7 +7,8 @@ DICOMweb endpoint.
 """
 import json
 import logging
-from typing import Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 try:
     import orthanc
@@ -23,6 +24,17 @@ from src.token_manager import TokenAcquisitionError, TokenManager
 
 # Plugin version
 __version__ = "1.0.0"
+
+# API versioning
+try:
+    from importlib.metadata import version
+
+    PLUGIN_VERSION = version("orthanc-dicomweb-oauth")
+except Exception:
+    # Fallback if package not installed (development/testing)
+    PLUGIN_VERSION = __version__
+
+API_VERSION = "2.0"  # Major.Minor only
 
 # Global context instance
 _plugin_context: Optional[PluginContext] = None
@@ -158,47 +170,105 @@ def on_outgoing_http_request(
         }
 
 
-def handle_rest_api_status(output, uri, **request) -> None:
+def create_api_response(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    GET /dicomweb-oauth/status
+    Create standardized API response with version information.
 
-    Returns plugin status and configuration summary.
+    Args:
+        data: Response data payload
+
+    Returns:
+        Response dictionary with version headers and data
     """
-    context = get_plugin_context()
+    from datetime import timezone
 
-    status = {
-        "plugin": "DICOMweb OAuth",
-        "version": __version__,
-        "status": "active",
-        "configured_servers": len(context.token_managers),
-        "servers": list(context.token_managers.keys()),
+    return {
+        "plugin_version": PLUGIN_VERSION,
+        "api_version": API_VERSION,
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "data": data,
     }
 
-    output.AnswerBuffer(json.dumps(status, indent=2), "application/json")
+
+def handle_rest_api_status(output, uri, **request) -> None:
+    """
+    REST API endpoint: Plugin status check.
+
+    Returns plugin health, version, and basic metrics.
+
+    GET /dicomweb-oauth/status
+
+    Response:
+        {
+            "plugin_version": "2.0.0",
+            "api_version": "2.0",
+            "timestamp": "2026-02-07T10:30:00Z",
+            "data": {
+                "status": "healthy",
+                "token_managers": 1,
+                "servers_configured": 1
+            }
+        }
+    """
+    try:
+        context = get_plugin_context()
+
+        data = {
+            "status": "healthy",
+            "token_managers": len(context.token_managers),
+            "servers_configured": len(context.server_urls),
+        }
+
+        response = create_api_response(data)
+        output.AnswerBuffer(json.dumps(response, indent=2), "application/json")
+
+    except Exception as e:
+        logger.error(f"Status endpoint failed: {type(e).__name__}: {e}")
+        error_response = create_api_response({"status": "error", "error": str(e)})
+        output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
 def handle_rest_api_servers(output, uri, **request) -> None:
     """
+    REST API endpoint: List configured servers.
+
+    Returns list of configured OAuth servers and their token status.
+
     GET /dicomweb-oauth/servers
 
-    Returns list of configured servers and their status.
-    """
-    context = get_plugin_context()
-
-    servers = []
-    for server_name, token_manager in context.token_managers.items():
-        server_info = {
-            "name": server_name,
-            "url": context.get_server_url(server_name),
-            "token_endpoint": token_manager.token_endpoint,
-            "has_cached_token": token_manager._cached_token is not None,
-            "token_valid": token_manager._is_token_valid()
-            if token_manager._cached_token
-            else False,
+    Response:
+        {
+            "plugin_version": "2.0.0",
+            "api_version": "2.0",
+            "timestamp": "2026-02-07T10:30:00Z",
+            "data": {
+                "servers": [...]
+            }
         }
-        servers.append(server_info)
+    """
+    try:
+        context = get_plugin_context()
 
-    output.AnswerBuffer(json.dumps({"servers": servers}, indent=2), "application/json")
+        servers = []
+        for server_name, token_manager in context.token_managers.items():
+            server_info = {
+                "name": server_name,
+                "url": context.get_server_url(server_name),
+                "token_endpoint": token_manager.token_endpoint,
+                "has_cached_token": token_manager._cached_token is not None,
+                "token_valid": token_manager._is_token_valid()
+                if token_manager._cached_token
+                else False,
+            }
+            servers.append(server_info)
+
+        response = create_api_response({"servers": servers})
+        output.AnswerBuffer(json.dumps(response, indent=2), "application/json")
+
+    except Exception as e:
+        logger.error(f"Servers endpoint failed: {type(e).__name__}: {e}")
+        error_response = create_api_response({"error": str(e)})
+        output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
 def handle_rest_api_test_server(output, uri, **request) -> None:
