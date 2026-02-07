@@ -87,3 +87,49 @@ def test_servers_endpoint():
     assert response["servers"][0]["url"] == "https://dicom.example.com/v2/"
     assert response["servers"][0]["has_cached_token"] is True
     assert response["servers"][0]["token_valid"] is True
+
+
+@responses.activate
+def test_status_endpoint_no_token_exposure():
+    """Test that test server endpoint never exposes token content."""
+    responses.add(
+        responses.POST,
+        "https://login.example.com/oauth2/token",
+        json={
+            "access_token": "test_token_12345678901234567890",
+            "token_type": "Bearer",
+            "expires_in": 3600
+        },
+        status=200
+    )
+
+    mock_orthanc = Mock()
+    mock_orthanc.GetConfiguration.return_value = {
+        "DicomWebOAuth": {
+            "Servers": {
+                "test-server": {
+                    "Url": "https://dicom.example.com/v2/",
+                    "TokenEndpoint": "https://login.example.com/oauth2/token",
+                    "ClientId": "client123",
+                    "ClientSecret": "secret456",
+                    "Scope": "scope"
+                }
+            }
+        }
+    }
+    initialize_plugin(mock_orthanc)
+
+    # Call test server endpoint
+    output = Mock()
+    result = handle_rest_api_test_server(output, "/dicomweb-oauth/servers/test-server/test")
+
+    # Parse response
+    response = json.loads(output.AnswerBuffer.call_args[0][0])
+
+    # Verify no token content is exposed
+    assert "token_preview" not in response
+    assert "token" not in response
+    assert "access_token" not in response
+    # Should only have boolean status
+    assert "has_token" in response
+    assert isinstance(response["has_token"], bool)

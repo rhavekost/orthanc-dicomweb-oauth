@@ -227,8 +227,7 @@ def handle_rest_api_test_server(output, uri, **request):
             "server": server_name,
             "status": "success",
             "token_acquired": True,
-            "token_length": len(token),
-            "token_preview": token[:20] + "..." if len(token) > 20 else token
+            "has_token": token is not None
         }
 
         output.AnswerBuffer(json.dumps(result, indent=2), "application/json")
