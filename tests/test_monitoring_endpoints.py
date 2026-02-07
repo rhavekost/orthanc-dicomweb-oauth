@@ -37,10 +37,16 @@ def test_status_endpoint():
     # Parse response
     response = json.loads(output.AnswerBuffer.call_args[0][0])
 
-    assert response["plugin"] == "DICOMweb OAuth"
-    assert response["version"] == "1.0.0"
-    assert response["status"] == "active"
-    assert response["configured_servers"] == 1
+    # Check version fields
+    assert "plugin_version" in response
+    assert "api_version" in response
+    assert "timestamp" in response
+    assert "data" in response
+
+    # Check data content
+    data = response["data"]
+    assert data["status"] == "healthy"
+    assert data["servers_configured"] == 1
 
 
 @responses.activate
@@ -80,11 +86,18 @@ def test_servers_endpoint():
     # Parse response
     response = json.loads(output.AnswerBuffer.call_args[0][0])
 
-    assert len(response["servers"]) == 1
-    assert response["servers"][0]["name"] == "test-server"
-    assert response["servers"][0]["url"] == "https://dicom.example.com/v2/"
-    assert response["servers"][0]["has_cached_token"] is True
-    assert response["servers"][0]["token_valid"] is True
+    # Check version fields
+    assert "plugin_version" in response
+    assert "api_version" in response
+    assert "data" in response
+
+    # Check servers data
+    servers = response["data"]["servers"]
+    assert len(servers) == 1
+    assert servers[0]["name"] == "test-server"
+    assert servers[0]["url"] == "https://dicom.example.com/v2/"
+    assert servers[0]["has_cached_token"] is True
+    assert servers[0]["token_valid"] is True
 
 
 @responses.activate
