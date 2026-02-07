@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-02-07
+
+### Added
+- HTTP client abstraction for dependency injection and testability
+- Correlation IDs for distributed tracing and request tracking
+- Automatic secret redaction in logs (client_secret, api_key, password, tokens)
+- JSON Schema validation for configuration with user-friendly error messages
+- Configuration versioning and migration (v1.0 to v2.0)
+- Log rotation with configurable size and backup count
+- Comprehensive test suite with 28 new tests (84% code coverage)
+
+### Changed
+- **BREAKING**: OAuth providers now accept optional http_client parameter
+- **BREAKING**: Configuration now supports ConfigVersion field (auto-migrated from v1.0)
+- Structured logger enhanced with correlation IDs and secret redaction
+- Configuration parser auto-migrates old configs to v2.0 format
+- Structured logger supports optional file output with rotation
+
+### Fixed
+- SOLID Dependency Inversion Principle violation in OAuth providers
+- Logging gaps: correlation IDs, secret leakage, log rotation
+- Configuration management: validation, versioning
+
+## [Previous Releases]
+
 ### Security
 - Remove token exposure from API endpoints (CV-1 CVSS 9.1)
 - Add explicit SSL/TLS certificate verification (CV-2 CVSS 9.3)
