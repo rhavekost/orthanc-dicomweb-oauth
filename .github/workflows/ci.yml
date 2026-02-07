@@ -77,8 +77,59 @@ jobs:
       - name: Run flake8
         run: flake8 src/ tests/
 
-      - name: Run mypy
-        run: mypy src/ --ignore-missing-imports
+      - name: Run mypy (strict mode)
+        run: mypy src/
+
+      - name: Run pylint
+        run: pylint src/ --rcfile=pyproject.toml --fail-under=9.0
+
+      - name: Run bandit (security)
+        run: bandit -r src/ -ll
+
+      - name: Run pydocstyle (docstrings)
+        run: pydocstyle --convention=google --add-ignore=D105,D107,D102,D212 src/
+
+  code-quality:
+    name: Code Quality Metrics
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip==23.3.2
+          pip install -r requirements-dev.txt
+
+      - name: Check complexity with radon
+        run: |
+          radon cc src/ -a --total-average
+          echo "Checking that average complexity is acceptable..."
+          pytest tests/test_comment_quality.py -v
+
+      - name: Check for dead code with vulture
+        run: |
+          vulture src/ --min-confidence 80
+          pytest tests/test_linting_tools.py::test_vulture_finds_minimal_dead_code -v
+
+      - name: Verify type coverage
+        run: pytest tests/test_type_coverage.py -v
+
+      - name: Verify docstring coverage
+        run: pytest tests/test_docstring_coverage.py -v
+
+      - name: Verify naming conventions
+        run: pytest tests/test_naming_conventions.py -v
+
+      - name: Verify code quality standards
+        run: pytest tests/test_code_quality.py -v
 
   integration:
     name: Integration Tests
