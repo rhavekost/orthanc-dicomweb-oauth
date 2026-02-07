@@ -157,7 +157,7 @@ def _find_server_for_uri(uri: str) -> Optional[str]:
     return None
 
 
-def handle_rest_api_status(output, uri, **request):
+def handle_rest_api_status(output, uri, **request) -> None:
     """
     GET /dicomweb-oauth/status
 
@@ -176,7 +176,7 @@ def handle_rest_api_status(output, uri, **request):
     output.AnswerBuffer(json.dumps(status, indent=2), "application/json")
 
 
-def handle_rest_api_servers(output, uri, **request):
+def handle_rest_api_servers(output, uri, **request) -> None:
     """
     GET /dicomweb-oauth/servers
 
@@ -202,7 +202,7 @@ def handle_rest_api_servers(output, uri, **request):
     output.AnswerBuffer(json.dumps({"servers": servers}, indent=2), "application/json")
 
 
-def handle_rest_api_test_server(output, uri, **request):
+def handle_rest_api_test_server(output, uri, **request) -> None:
     """
     POST /dicomweb-oauth/servers/{name}/test
 
