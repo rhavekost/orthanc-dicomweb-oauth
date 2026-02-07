@@ -4,6 +4,7 @@ from typing import Any, Dict, Type
 from src.oauth_providers.azure import AzureOAuthProvider
 from src.oauth_providers.base import OAuthConfig, OAuthProvider
 from src.oauth_providers.generic import GenericOAuth2Provider
+from src.oauth_providers.google import GoogleProvider
 
 
 class OAuthProviderFactory:
@@ -17,8 +18,8 @@ class OAuthProviderFactory:
     _providers: Dict[str, Type[OAuthProvider]] = {
         "generic": GenericOAuth2Provider,
         "azure": AzureOAuthProvider,
+        "google": GoogleProvider,
         # Add more providers here as implemented:
-        # "google": GoogleOAuthProvider,
         # "keycloak": KeycloakOAuthProvider,
     }
 
