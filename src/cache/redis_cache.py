@@ -2,7 +2,7 @@
 import json
 from typing import Any, Optional
 
-import redis  # type: ignore[import-untyped]
+import redis  # type: ignore[import-untyped]  # noqa: TCH002
 
 from src.cache.base import CacheBackend
 

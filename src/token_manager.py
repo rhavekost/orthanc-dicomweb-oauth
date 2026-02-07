@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional, cast
 
 import requests
 
+from src.cache.base import CacheBackend
+from src.cache.memory_cache import MemoryCache
 from src.error_codes import ErrorCode, NetworkError, TokenAcquisitionError
 from src.metrics import MetricsCollector
 from src.oauth_providers.base import OAuthProvider
@@ -46,13 +48,21 @@ DEFAULT_REFRESH_BUFFER_SECONDS = 300
 class TokenManager:
     """Manages OAuth2 token acquisition, caching, and refresh for a DICOMweb server."""
 
-    def __init__(self, server_name: str, config: Dict[str, Any]) -> None:
+    def __init__(
+        self,
+        server_name: str,
+        config: Dict[str, Any],
+        cache: Optional[CacheBackend] = None,
+    ) -> None:
         """
         Initialize token manager for a DICOMweb server.
 
         Args:
             server_name: Name of the server (for logging)
-            config: Server configuration containing TokenEndpoint, ClientId, etc.
+            config: Server configuration containing TokenEndpoint,
+                ClientId, etc.
+            cache: Cache backend for distributed token storage
+                (optional, defaults to MemoryCache)
         """
         self.server_name = server_name
         self.config = config
@@ -61,7 +71,11 @@ class TokenManager:
         # Initialize secrets manager for encryption
         self._secrets_manager = SecretsManager()
 
-        # Token cache (encrypted)
+        # Initialize cache backend
+        # (use provided cache or default to MemoryCache)
+        self._cache = cache or MemoryCache()
+
+        # Token cache (encrypted) - kept for backward compatibility with existing code
         self._encrypted_cached_token: Optional[bytes] = None
         self._token_expiry: Optional[datetime] = None
         self._lock = threading.Lock()
@@ -207,6 +221,9 @@ class TokenManager:
         """
         Get a valid OAuth2 access token, acquiring or refreshing as needed.
 
+        First checks distributed cache, then falls back to local cache,
+        and finally acquires a new token if needed.
+
         Returns:
             Valid access token string
 
@@ -214,20 +231,52 @@ class TokenManager:
             TokenAcquisitionError: If token acquisition fails
         """
         metrics = MetricsCollector.get_instance()
+        cache_key = f"token:{self.server_name}"
 
         with self._lock:
-            # Check if we have a valid cached token
+            # First, check distributed cache
+            cached_data = self._cache.get(cache_key)
+            if cached_data is not None:
+                # Validate token is not expired (with refresh buffer)
+                expires_at = cached_data.get("expires_at")
+                if expires_at:
+                    now = datetime.now(timezone.utc).timestamp()
+                    buffer_seconds = self.refresh_buffer_seconds
+                    # Token is valid if it won't expire within the buffer window
+                    if now + buffer_seconds < expires_at:
+                        # Record cache hit
+                        metrics.record_cache_hit(self.server_name)
+
+                        structured_logger.debug(
+                            "Using distributed cached token",
+                            server=self.server_name,
+                            operation="get_token",
+                            cached=True,
+                            cache_type="distributed",
+                        )
+                        logger.debug(
+                            f"Using distributed cached token "
+                            f"for server '{self.server_name}'"
+                        )
+
+                        access_token: str = cached_data["access_token"]
+                        return access_token
+
+            # Second, check local encrypted cache (backward compatibility)
             if self._is_token_valid():
                 # Record cache hit
                 metrics.record_cache_hit(self.server_name)
 
                 structured_logger.debug(
-                    "Using cached token",
+                    "Using local cached token",
                     server=self.server_name,
                     operation="get_token",
                     cached=True,
+                    cache_type="local",
                 )
-                logger.debug(f"Using cached token for server '{self.server_name}'")
+                logger.debug(
+                    f"Using local cached token for server '{self.server_name}'"
+                )
 
                 cached_token = self._get_cached_token()
                 assert cached_token is not None  # Validated by _is_token_valid
@@ -310,14 +359,27 @@ class TokenManager:
     def _acquire_with_retry_config(self) -> str:
         """Acquire token using configured retry strategy."""
         assert self._retry_config is not None
+        cache_key = f"token:{self.server_name}"
 
         def attempt_acquire() -> str:
             oauth_token = self.provider.acquire_token()
 
-            # Cache encrypted token
+            # Cache encrypted token locally (backward compatibility)
             self._set_cached_token(oauth_token.access_token)
             self._token_expiry = datetime.now(timezone.utc) + timedelta(
                 seconds=oauth_token.expires_in
+            )
+
+            # Store in distributed cache with TTL
+            ttl = oauth_token.expires_in - 60  # 60s buffer before expiration
+            expires_at = datetime.now(timezone.utc).timestamp() + oauth_token.expires_in
+            self._cache.set(
+                cache_key,
+                {
+                    "access_token": oauth_token.access_token,
+                    "expires_at": expires_at,
+                },
+                ttl=ttl if ttl > 0 else oauth_token.expires_in,
             )
 
             # Validate token if provider supports it
@@ -402,16 +464,31 @@ class TokenManager:
         """Legacy token acquisition with hardcoded exponential backoff."""
         max_retries = MAX_TOKEN_ACQUISITION_RETRIES
         retry_delay = INITIAL_RETRY_DELAY_SECONDS
+        cache_key = f"token:{self.server_name}"
 
         for attempt in range(max_retries):
             try:
                 # Use provider to acquire token
                 oauth_token = self.provider.acquire_token()
 
-                # Cache encrypted token
+                # Cache encrypted token locally (backward compatibility)
                 self._set_cached_token(oauth_token.access_token)
                 self._token_expiry = datetime.now(timezone.utc) + timedelta(
                     seconds=oauth_token.expires_in
+                )
+
+                # Store in distributed cache with TTL
+                ttl = oauth_token.expires_in - 60  # 60s buffer before expiration
+                expires_at = (
+                    datetime.now(timezone.utc).timestamp() + oauth_token.expires_in
+                )
+                self._cache.set(
+                    cache_key,
+                    {
+                        "access_token": oauth_token.access_token,
+                        "expires_at": expires_at,
+                    },
+                    ttl=ttl if ttl > 0 else oauth_token.expires_in,
                 )
 
                 # Validate token if provider supports it
