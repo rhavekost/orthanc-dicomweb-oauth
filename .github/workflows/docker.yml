@@ -62,7 +62,7 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} python -c "import src.dicomweb_oauth_plugin; print('Plugin loaded successfully')"
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main python -c "import sys; sys.path.insert(0, '/etc/orthanc/plugins'); import dicomweb_oauth_plugin; print('Plugin loaded successfully')"
 
       - name: Push Docker image
         if: github.event_name != 'pull_request'
