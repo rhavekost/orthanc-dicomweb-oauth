@@ -55,6 +55,8 @@ class RedisCache(CacheBackend):
                 return None
 
             # Deserialize JSON
+            # Redis client returns bytes in sync mode, but mypy may infer Awaitable
+            assert isinstance(value, bytes), "Expected bytes from Redis"
             return json.loads(value.decode("utf-8"))
         except Exception:
             return None
