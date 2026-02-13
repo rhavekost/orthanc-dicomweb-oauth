@@ -76,6 +76,8 @@ if echo "$STATUS_RESPONSE" | grep -q '"status"'; then
 else
     echo -e "${RED}✗${NC}"
     echo "Response: $STATUS_RESPONSE"
+    echo -e "${YELLOW}Orthanc logs:${NC}"
+    docker logs $CONTAINER_NAME 2>&1 | tail -50
     exit 1
 fi
 

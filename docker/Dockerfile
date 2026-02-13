@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y python3-requests && rm -rf /var/lib/apt
 COPY src/ /etc/orthanc/plugins/src/
 
 # Set Python path to include plugin directory
-ENV PYTHONPATH=/etc/orthanc/plugins:$PYTHONPATH
+ENV PYTHONPATH=/etc/orthanc/plugins
 
 # Copy Orthanc configuration
 COPY docker/orthanc.json /etc/orthanc/
