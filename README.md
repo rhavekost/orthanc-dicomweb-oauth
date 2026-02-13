@@ -385,3 +385,4 @@ MIT License - See LICENSE file for details
 ## Acknowledgments
 
 Built with ❤️ for the medical imaging community. Special thanks to the Orthanc project for creating an excellent open-source PACS.
+<!-- Trigger CI -->
