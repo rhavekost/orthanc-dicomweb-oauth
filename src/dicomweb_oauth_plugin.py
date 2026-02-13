@@ -24,9 +24,9 @@ try:
     _FLASK_AVAILABLE = True
 except ImportError:
     _FLASK_AVAILABLE = False
-    Flask = None
-    jsonify = None
-    request = None
+    Flask = None  # type: ignore[assignment,misc]
+    jsonify = None  # type: ignore[assignment]
+    request = None  # type: ignore[assignment]
 
 from src.config_parser import ConfigError, ConfigParser
 from src.metrics import get_metrics_text
@@ -72,9 +72,11 @@ def initialize_plugin(
     logger.info("Initializing DICOMweb OAuth plugin")
 
     try:
-        # Load configuration (GetConfiguration returns JSON string)
-        config_str = orthanc_module.GetConfiguration()
-        config = json.loads(config_str)
+        # Load configuration (string in Orthanc, dict in tests)
+        config_data = orthanc_module.GetConfiguration()
+        config = (
+            json.loads(config_data) if isinstance(config_data, str) else config_data
+        )
         parser = ConfigParser(config)
         servers = parser.get_servers()
 
@@ -377,7 +379,7 @@ def create_flask_app(
     app = Flask(__name__)
 
     # Initialize rate limiter
-    app.rate_limiter = RateLimiter(
+    app.rate_limiter = RateLimiter(  # type: ignore[attr-defined]
         max_requests=rate_limit_requests, window_seconds=rate_limit_window
     )
 
@@ -402,14 +404,14 @@ def create_flask_app(
             )
 
     # Rate limiting middleware
-    @app.before_request  # type: ignore[misc]
+    @app.before_request
     def check_rate_limit() -> Any:
         """Check rate limit before processing request."""
         # Use remote address as rate limit key
         client_key = request.remote_addr or "unknown"
 
         try:
-            app.rate_limiter.check_rate_limit(client_key)
+            app.rate_limiter.check_rate_limit(client_key)  # type: ignore[attr-defined]
         except RateLimitExceeded as e:
             # Log security event
             structured_logger.security_event(
@@ -436,7 +438,7 @@ def create_flask_app(
         return None
 
     # Register routes
-    @app.route("/dicomweb-oauth/status", methods=["GET"])  # type: ignore[misc]
+    @app.route("/dicomweb-oauth/status", methods=["GET"])
     def handle_status() -> Any:
         """Handle status endpoint."""
         try:
@@ -451,9 +453,7 @@ def create_flask_app(
             error_response = create_api_response({"status": "error", "error": str(e)})
             return jsonify(error_response)
 
-    @app.route(  # type: ignore[misc]
-        "/dicomweb-oauth/servers/<name>/test", methods=["POST"]
-    )
+    @app.route("/dicomweb-oauth/servers/<name>/test", methods=["POST"])
     def handle_test(name: str) -> Any:
         """Handle test endpoint."""
         if name not in context.token_managers:

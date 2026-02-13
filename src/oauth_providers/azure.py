@@ -2,7 +2,7 @@
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import jwt
-from jwt import PyJWKClient
+from jwt import PyJWKClient  # type: ignore[attr-defined]
 
 from src.jwt_validator import JWTValidator
 from src.oauth_providers.base import OAuthConfig, OAuthProvider
