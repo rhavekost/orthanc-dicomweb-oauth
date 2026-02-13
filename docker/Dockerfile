@@ -1,16 +1,16 @@
 FROM orthancteam/orthanc:latest
 
 # Install Python dependencies
-RUN pip install --no-cache-dir requests
+RUN pip install --no-cache-dir --break-system-packages requests
 
 # Copy plugin files
-COPY ../src/dicomweb_oauth_plugin.py /etc/orthanc/plugins/
-COPY ../src/token_manager.py /etc/orthanc/plugins/
-COPY ../src/config_parser.py /etc/orthanc/plugins/
-COPY ../src/__init__.py /etc/orthanc/plugins/
+COPY src/dicomweb_oauth_plugin.py /etc/orthanc/plugins/
+COPY src/token_manager.py /etc/orthanc/plugins/
+COPY src/config_parser.py /etc/orthanc/plugins/
+COPY src/__init__.py /etc/orthanc/plugins/
 
 # Copy Orthanc configuration
-COPY orthanc.json /etc/orthanc/
+COPY docker/orthanc.json /etc/orthanc/
 
 # Expose ports
 EXPOSE 8042 4242
