@@ -1,8 +1,8 @@
 # Orthanc DICOMweb OAuth Plugin
 
-[![CI](https://github.com/[username]/orthanc-dicomweb-oauth/actions/workflows/ci.yml/badge.svg)](https://github.com/[username]/orthanc-dicomweb-oauth/actions/workflows/ci.yml)
-[![Security](https://github.com/[username]/orthanc-dicomweb-oauth/actions/workflows/security.yml/badge.svg)](https://github.com/[username]/orthanc-dicomweb-oauth/actions/workflows/security.yml)
-[![codecov](https://codecov.io/gh/[username]/orthanc-dicomweb-oauth/branch/main/graph/badge.svg)](https://codecov.io/gh/[username]/orthanc-dicomweb-oauth)
+[![CI](https://github.com/rhavekost/orthanc-dicomweb-oauth/actions/workflows/ci.yml/badge.svg)](https://github.com/rhavekost/orthanc-dicomweb-oauth/actions/workflows/ci.yml)
+[![Security](https://github.com/rhavekost/orthanc-dicomweb-oauth/actions/workflows/security.yml/badge.svg)](https://github.com/rhavekost/orthanc-dicomweb-oauth/actions/workflows/security.yml)
+[![codecov](https://codecov.io/gh/rhavekost/orthanc-dicomweb-oauth/branch/main/graph/badge.svg)](https://codecov.io/gh/rhavekost/orthanc-dicomweb-oauth)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Generic OAuth2/OIDC token management plugin for Orthanc's DICOMweb connections. Automatically acquires, caches, and refreshes bearer tokens for any OAuth2-protected DICOMweb endpoint.
