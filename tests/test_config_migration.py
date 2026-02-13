@@ -2,7 +2,7 @@
 from src.config_migration import detect_config_version, migrate_config
 
 
-def test_detect_v1_config():
+def test_detect_v1_config() -> None:
     """Test detection of v1 configuration."""
     config_v1 = {
         "DicomWebOAuth": {
@@ -21,7 +21,7 @@ def test_detect_v1_config():
     assert version == "1.0"
 
 
-def test_detect_v2_config():
+def test_detect_v2_config() -> None:
     """Test detection of v2 configuration with explicit version."""
     config_v2 = {
         "ConfigVersion": "2.0",
@@ -42,7 +42,7 @@ def test_detect_v2_config():
     assert version == "2.0"
 
 
-def test_migrate_v1_to_v2():
+def test_migrate_v1_to_v2() -> None:
     """Test migration from v1 to v2 configuration."""
     config_v1 = {
         "DicomWebOAuth": {
@@ -72,7 +72,7 @@ def test_migrate_v1_to_v2():
     assert server["ProviderType"] == "auto"
 
 
-def test_migrate_already_v2():
+def test_migrate_already_v2() -> None:
     """Test that v2 config is not modified."""
     config_v2 = {
         "ConfigVersion": "2.0",

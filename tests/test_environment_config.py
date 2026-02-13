@@ -3,20 +3,20 @@ import json
 from pathlib import Path
 
 
-def test_staging_config_exists():
+def test_staging_config_exists() -> None:
     """Staging configuration file should exist."""
     staging_config = Path("docker/orthanc-staging.json")
     assert staging_config.exists(), "Staging config must exist"
 
 
-def test_staging_config_valid_json():
+def test_staging_config_valid_json() -> None:
     """Staging config should be valid JSON."""
     with open("docker/orthanc-staging.json") as f:
         config = json.load(f)
     assert isinstance(config, dict)
 
 
-def test_staging_config_has_environment_marker():
+def test_staging_config_has_environment_marker() -> None:
     """Staging config should clearly identify environment."""
     with open("docker/orthanc-staging.json") as f:
         config = json.load(f)
@@ -24,7 +24,7 @@ def test_staging_config_has_environment_marker():
     assert "staging" in config["Name"].lower() or "Staging" in config["Name"]
 
 
-def test_staging_has_authentication_enabled():
+def test_staging_has_authentication_enabled() -> None:
     """Staging must have authentication enabled for security."""
     with open("docker/orthanc-staging.json") as f:
         config = json.load(f)
@@ -33,7 +33,7 @@ def test_staging_has_authentication_enabled():
     ), "Staging environment must have authentication enabled"
 
 
-def test_staging_has_ssl_verification():
+def test_staging_has_ssl_verification() -> None:
     """Staging should have SSL verification enabled."""
     with open("docker/orthanc-staging.json") as f:
         config = json.load(f)
@@ -48,7 +48,7 @@ def test_staging_has_ssl_verification():
         ), f"Staging server '{server_name}' must have SSL verification enabled"
 
 
-def test_dev_config_has_security_warning():
+def test_dev_config_has_security_warning() -> None:
     """Development config should have clear security warning."""
     with open("docker/orthanc.json") as f:
         config = json.load(f)

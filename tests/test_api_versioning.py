@@ -9,7 +9,7 @@ from src.dicomweb_oauth_plugin import (
 )
 
 
-def test_api_response_has_version_fields():
+def test_api_response_has_version_fields() -> None:
     """API responses must include version information."""
     response = create_api_response({"test": "data"})
 
@@ -19,7 +19,7 @@ def test_api_response_has_version_fields():
     assert "data" in response
 
 
-def test_api_version_format():
+def test_api_version_format() -> None:
     """API version should be Major.Minor format."""
     response = create_api_response({})
     api_version = response["api_version"]
@@ -29,14 +29,14 @@ def test_api_version_format():
     assert all(part.isdigit() for part in parts), "Version parts must be numeric"
 
 
-def test_plugin_version_exists():
+def test_plugin_version_exists() -> None:
     """Plugin version must be set."""
     response = create_api_response({})
     assert response["plugin_version"] != ""
     assert isinstance(response["plugin_version"], str)
 
 
-def test_timestamp_iso8601_format():
+def test_timestamp_iso8601_format() -> None:
     """Timestamp should be ISO 8601 format with UTC timezone."""
     response = create_api_response({})
     timestamp = response["timestamp"]
@@ -45,7 +45,7 @@ def test_timestamp_iso8601_format():
     assert "T" in timestamp, "Timestamp must have T separator"
 
 
-def test_status_endpoint_returns_versioned_response():
+def test_status_endpoint_returns_versioned_response() -> None:
     """Status endpoint should return versioned response."""
     output = Mock()
 
@@ -64,7 +64,7 @@ def test_status_endpoint_returns_versioned_response():
         assert "api_version" in response
 
 
-def test_servers_endpoint_returns_versioned_response():
+def test_servers_endpoint_returns_versioned_response() -> None:
     """Servers endpoint should return versioned response."""
     output = Mock()
 

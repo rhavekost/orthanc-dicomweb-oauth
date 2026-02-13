@@ -8,7 +8,7 @@ from src.oauth_providers.factory import OAuthProviderFactory
 from src.oauth_providers.generic import GenericOAuth2Provider
 
 
-def test_provider_factory_azure():
+def test_provider_factory_azure() -> None:
     """Test creating Azure provider."""
     config = {
         "TokenEndpoint": "https://login.microsoftonline.com/tenant/oauth2/v2.0/token",
@@ -25,7 +25,7 @@ def test_provider_factory_azure():
     assert provider.tenant_id == "test-tenant"
 
 
-def test_provider_factory_generic():
+def test_provider_factory_generic() -> None:
     """Test creating generic provider."""
     config = {
         "TokenEndpoint": "https://auth.example.com/token",
@@ -39,7 +39,7 @@ def test_provider_factory_generic():
     assert provider.provider_name == "generic-oauth2"
 
 
-def test_auto_detect_azure():
+def test_auto_detect_azure() -> None:
     """Test auto-detecting Azure provider."""
     config = {
         "TokenEndpoint": "https://login.microsoftonline.com/tenant/oauth2/v2.0/token",
@@ -49,7 +49,7 @@ def test_auto_detect_azure():
     assert provider_type == "azure"
 
 
-def test_auto_detect_generic():
+def test_auto_detect_generic() -> None:
     """Test auto-detecting generic provider."""
     config = {
         "TokenEndpoint": "https://auth.example.com/token",
@@ -59,7 +59,7 @@ def test_auto_detect_generic():
     assert provider_type == "generic"
 
 
-def test_provider_factory_unknown():
+def test_provider_factory_unknown() -> None:
     """Test error for unknown provider type."""
     config = {
         "TokenEndpoint": "https://auth.example.com/token",
@@ -71,8 +71,8 @@ def test_provider_factory_unknown():
         OAuthProviderFactory.create("unknown", config)
 
 
-@responses.activate
-def test_generic_provider_acquire_token():
+@responses.activate  # type: ignore[misc]
+def test_generic_provider_acquire_token() -> None:
     """Test generic provider token acquisition."""
     responses.add(
         responses.POST,
@@ -96,8 +96,8 @@ def test_generic_provider_acquire_token():
     assert token.token_type == "Bearer"
 
 
-@responses.activate
-def test_generic_provider_with_scope():
+@responses.activate  # type: ignore[misc]
+def test_generic_provider_with_scope() -> None:
     """Test generic provider includes scope in request."""
     responses.add(
         responses.POST,
@@ -122,7 +122,7 @@ def test_generic_provider_with_scope():
     assert "scope=custom.scope" in request_body
 
 
-def test_generic_provider_validate_token():
+def test_generic_provider_validate_token() -> None:
     """Test generic provider always validates tokens (no JWT validation)."""
     config = OAuthConfig(
         token_endpoint="https://auth.example.com/token",
@@ -135,7 +135,7 @@ def test_generic_provider_validate_token():
     assert provider.validate_token("any-token") is True
 
 
-def test_register_custom_provider():
+def test_register_custom_provider() -> None:
     """Test registering a custom provider type."""
 
     class CustomProvider(GenericOAuth2Provider):
@@ -156,7 +156,7 @@ def test_register_custom_provider():
     assert provider.provider_name == "custom"
 
 
-def test_generic_provider_with_mock_http_client():
+def test_generic_provider_with_mock_http_client() -> None:
     """Test provider with injected mock HTTP client."""
     from unittest.mock import Mock
 

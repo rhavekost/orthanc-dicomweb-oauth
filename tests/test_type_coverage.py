@@ -32,7 +32,7 @@ def get_function_signature_coverage(file_path: Path) -> Dict[str, bool]:
     return results
 
 
-def test_dicomweb_oauth_plugin_type_coverage():
+def test_dicomweb_oauth_plugin_type_coverage() -> None:
     """All functions in dicomweb_oauth_plugin.py must have complete type hints."""
     file_path = Path("src/dicomweb_oauth_plugin.py")
     coverage = get_function_signature_coverage(file_path)
@@ -46,7 +46,7 @@ def test_dicomweb_oauth_plugin_type_coverage():
     )
 
 
-def test_token_manager_type_coverage():
+def test_token_manager_type_coverage() -> None:
     """All functions in token_manager.py must have complete type hints."""
     file_path = Path("src/token_manager.py")
     coverage = get_function_signature_coverage(file_path)
@@ -61,7 +61,7 @@ def test_token_manager_type_coverage():
     )
 
 
-def test_config_parser_type_coverage():
+def test_config_parser_type_coverage() -> None:
     """All functions in config_parser.py must have complete type hints."""
     file_path = Path("src/config_parser.py")
     coverage = get_function_signature_coverage(file_path)

@@ -5,7 +5,7 @@ import responses
 from src.dicomweb_oauth_plugin import initialize_plugin, on_outgoing_http_request
 
 
-def test_plugin_initialization():
+def test_plugin_initialization() -> None:
     """Test that plugin initializes with valid configuration."""
     mock_orthanc = Mock()
     mock_orthanc.GetConfiguration.return_value = {
@@ -29,8 +29,8 @@ def test_plugin_initialization():
     mock_orthanc.GetConfiguration.assert_called_once()
 
 
-@responses.activate
-def test_inject_authorization_header():
+@responses.activate  # type: ignore[misc]
+def test_inject_authorization_header() -> None:
     """Test that Authorization header is injected for configured servers."""
     # Setup mock token response
     responses.add(
@@ -77,7 +77,7 @@ def test_inject_authorization_header():
     assert result["headers"]["Authorization"] == "Bearer test_token_123"
 
 
-def test_non_oauth_request_passes_through():
+def test_non_oauth_request_passes_through() -> None:
     """Test that requests to non-configured servers pass through unchanged."""
     # Initialize plugin with no matching server
     mock_orthanc = Mock()

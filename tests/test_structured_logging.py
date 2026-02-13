@@ -6,7 +6,7 @@ from io import StringIO
 from src.structured_logger import JsonFormatter, StructuredLogger
 
 
-def test_json_formatter():
+def test_json_formatter() -> None:
     """Test JSON log formatter."""
     # Arrange
     logger = StructuredLogger("test")
@@ -33,7 +33,7 @@ def test_json_formatter():
     assert "module" in log_entry
 
 
-def test_context_propagation():
+def test_context_propagation() -> None:
     """Test context fields propagate to all logs."""
     logger = StructuredLogger("test")
     output = StringIO()
@@ -60,7 +60,7 @@ def test_context_propagation():
         assert log_entry["request_id"] == "12345"
 
 
-def test_clear_context():
+def test_clear_context() -> None:
     """Test clearing context fields."""
     logger = StructuredLogger("test")
     output = StringIO()
@@ -81,7 +81,7 @@ def test_clear_context():
     assert "server" not in log_entry
 
 
-def test_log_levels():
+def test_log_levels() -> None:
     """Test different log levels."""
     logger = StructuredLogger("test")
     output = StringIO()
@@ -106,7 +106,7 @@ def test_log_levels():
     assert levels == ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
-def test_exception_logging():
+def test_exception_logging() -> None:
     """Test exception info is included in logs."""
     logger = StructuredLogger("test")
     output = StringIO()
@@ -129,7 +129,7 @@ def test_exception_logging():
     assert "ValueError: Test error" in log_entry["exception"]
 
 
-def test_no_sensitive_data():
+def test_no_sensitive_data() -> None:
     """Test that sensitive data is not logged."""
     logger = StructuredLogger("test")
     output = StringIO()

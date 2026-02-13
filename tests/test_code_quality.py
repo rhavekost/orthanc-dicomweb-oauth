@@ -3,7 +3,7 @@ import ast
 from pathlib import Path
 
 
-def test_no_magic_numbers_in_token_manager():
+def test_no_magic_numbers_in_token_manager() -> None:
     """Token manager should use named constants instead of magic numbers."""
     file_path = Path("src/token_manager.py")
 

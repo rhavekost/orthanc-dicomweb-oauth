@@ -1,16 +1,19 @@
 """Tests for correlation ID tracking."""
 import json
+import logging
 from io import StringIO
+from typing import cast
 
 from src.structured_logger import StructuredLogger
 
 
-def test_correlation_id_in_logs():
+def test_correlation_id_in_logs() -> None:
     """Test that correlation ID appears in all log entries."""
     # Create logger with string stream
     stream = StringIO()
     logger = StructuredLogger(name="test-correlation")
-    logger.logger.handlers[0].stream = stream
+    handler = cast(logging.StreamHandler[StringIO], logger.logger.handlers[0])
+    handler.stream = stream
 
     # Set correlation ID
     logger.set_correlation_id("req-123")
@@ -31,11 +34,12 @@ def test_correlation_id_in_logs():
         assert entry["correlation_id"] == "req-123"
 
 
-def test_correlation_id_cleared():
+def test_correlation_id_cleared() -> None:
     """Test that correlation ID can be cleared."""
     stream = StringIO()
     logger = StructuredLogger(name="test-clear")
-    logger.logger.handlers[0].stream = stream
+    handler = cast(logging.StreamHandler[StringIO], logger.logger.handlers[0])
+    handler.stream = stream
 
     # Set and clear correlation ID
     logger.set_correlation_id("req-456")
@@ -52,7 +56,7 @@ def test_correlation_id_cleared():
     assert "correlation_id" not in log_entry
 
 
-def test_auto_generate_correlation_id():
+def test_auto_generate_correlation_id() -> None:
     """Test automatic correlation ID generation."""
     logger = StructuredLogger(name="test-auto")
 

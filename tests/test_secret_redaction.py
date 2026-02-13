@@ -1,11 +1,13 @@
 """Tests for secret redaction in logs."""
 import json
+import logging
 from io import StringIO
+from typing import cast
 
 from src.structured_logger import StructuredLogger, redact_secrets
 
 
-def test_redact_secrets_in_string():
+def test_redact_secrets_in_string() -> None:
     """Test secret redaction in plain strings."""
     # Test various secret patterns
     test_cases = [
@@ -36,7 +38,7 @@ def test_redact_secrets_in_string():
         assert result == expected, f"Failed for: {original}"
 
 
-def test_redact_secrets_in_dict():
+def test_redact_secrets_in_dict() -> None:
     """Test secret redaction in dictionaries."""
     data = {
         "client_id": "public_client",
@@ -55,11 +57,12 @@ def test_redact_secrets_in_dict():
     assert redacted["password"] == "***REDACTED***"
 
 
-def test_structured_logger_redacts_secrets():
+def test_structured_logger_redacts_secrets() -> None:
     """Test that structured logger redacts secrets automatically."""
     stream = StringIO()
     logger = StructuredLogger(name="test-redact")
-    logger.logger.handlers[0].stream = stream
+    handler = cast(logging.StreamHandler[StringIO], logger.logger.handlers[0])
+    handler.stream = stream
 
     # Log entry with secrets
     logger.error(

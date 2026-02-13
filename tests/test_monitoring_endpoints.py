@@ -12,7 +12,7 @@ from src.dicomweb_oauth_plugin import (
 )
 
 
-def test_status_endpoint():
+def test_status_endpoint() -> None:
     """Test GET /dicomweb-oauth/status returns plugin status."""
     mock_orthanc = Mock()
     mock_orthanc.GetConfiguration.return_value = {
@@ -49,8 +49,8 @@ def test_status_endpoint():
     assert data["servers_configured"] == 1
 
 
-@responses.activate
-def test_servers_endpoint():
+@responses.activate  # type: ignore[misc]
+def test_servers_endpoint() -> None:
     """Test GET /dicomweb-oauth/servers returns server details."""
     responses.add(
         responses.POST,
@@ -100,8 +100,8 @@ def test_servers_endpoint():
     assert servers[0]["token_valid"] is True
 
 
-@responses.activate
-def test_status_endpoint_no_token_exposure():
+@responses.activate  # type: ignore[misc]
+def test_status_endpoint_no_token_exposure() -> None:
     """Test that test server endpoint never exposes token content."""
     responses.add(
         responses.POST,
