@@ -42,7 +42,7 @@ trap cleanup EXIT
 cleanup
 
 echo -e "${YELLOW}Step 1: Building Docker image...${NC}"
-docker build -t orthanc-oauth-test:latest .
+docker build -f docker/Dockerfile -t orthanc-oauth-test:latest .
 
 echo -e "${YELLOW}Step 2: Starting Orthanc container...${NC}"
 docker run -d \
