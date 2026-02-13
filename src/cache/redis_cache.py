@@ -2,7 +2,7 @@
 import json
 from typing import Any, Optional
 
-import redis  # noqa: TCH002
+import redis
 
 from src.cache.base import CacheBackend
 

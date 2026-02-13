@@ -26,7 +26,7 @@ command -v curl >/dev/null 2>&1 || {
 # Configuration
 ORTHANC_PORT=8042
 CONTAINER_NAME="orthanc-oauth-integration-test"
-MAX_WAIT=30
+MAX_WAIT=60
 
 # Cleanup function
 cleanup() {

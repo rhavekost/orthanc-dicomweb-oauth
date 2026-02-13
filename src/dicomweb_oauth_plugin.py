@@ -24,9 +24,9 @@ try:
     _FLASK_AVAILABLE = True
 except ImportError:
     _FLASK_AVAILABLE = False
-    Flask = None  # type: ignore[assignment,misc]
-    jsonify = None  # type: ignore[assignment]
-    request = None  # type: ignore[assignment]
+    Flask = None
+    jsonify = None
+    request = None
 
 from src.config_parser import ConfigError, ConfigParser
 from src.metrics import get_metrics_text
@@ -72,8 +72,9 @@ def initialize_plugin(
     logger.info("Initializing DICOMweb OAuth plugin")
 
     try:
-        # Load configuration
-        config = orthanc_module.GetConfiguration()
+        # Load configuration (GetConfiguration returns JSON string)
+        config_str = orthanc_module.GetConfiguration()
+        config = json.loads(config_str)
         parser = ConfigParser(config)
         servers = parser.get_servers()
 
@@ -376,7 +377,7 @@ def create_flask_app(
     app = Flask(__name__)
 
     # Initialize rate limiter
-    app.rate_limiter = RateLimiter(  # type: ignore[attr-defined]
+    app.rate_limiter = RateLimiter(
         max_requests=rate_limit_requests, window_seconds=rate_limit_window
     )
 
@@ -401,14 +402,14 @@ def create_flask_app(
             )
 
     # Rate limiting middleware
-    @app.before_request
+    @app.before_request  # type: ignore[misc]
     def check_rate_limit() -> Any:
         """Check rate limit before processing request."""
         # Use remote address as rate limit key
         client_key = request.remote_addr or "unknown"
 
         try:
-            app.rate_limiter.check_rate_limit(client_key)  # type: ignore[attr-defined]
+            app.rate_limiter.check_rate_limit(client_key)
         except RateLimitExceeded as e:
             # Log security event
             structured_logger.security_event(
@@ -435,7 +436,7 @@ def create_flask_app(
         return None
 
     # Register routes
-    @app.route("/dicomweb-oauth/status", methods=["GET"])
+    @app.route("/dicomweb-oauth/status", methods=["GET"])  # type: ignore[misc]
     def handle_status() -> Any:
         """Handle status endpoint."""
         try:
@@ -450,7 +451,9 @@ def create_flask_app(
             error_response = create_api_response({"status": "error", "error": str(e)})
             return jsonify(error_response)
 
-    @app.route("/dicomweb-oauth/servers/<name>/test", methods=["POST"])
+    @app.route(  # type: ignore[misc]
+        "/dicomweb-oauth/servers/<name>/test", methods=["POST"]
+    )
     def handle_test(name: str) -> Any:
         """Handle test endpoint."""
         if name not in context.token_managers:
@@ -500,7 +503,17 @@ if _ORTHANC_AVAILABLE and orthanc is not None:
     try:
         logger.info("Registering DICOMweb OAuth plugin with Orthanc")
         initialize_plugin()
-        orthanc.RegisterOnOutgoingHttpRequestFilter(on_outgoing_http_request)
+
+        # Register HTTP request filter only if available (Orthanc SDK >= 1.12.1)
+        if hasattr(orthanc, "RegisterOnOutgoingHttpRequestFilter"):
+            logger.info("Registering outgoing HTTP request filter")
+            orthanc.RegisterOnOutgoingHttpRequestFilter(on_outgoing_http_request)
+        else:
+            logger.warning(
+                "RegisterOnOutgoingHttpRequestFilter not available - "
+                "automatic OAuth token injection will not work. "
+                "Please upgrade to Orthanc SDK >= 1.12.1"
+            )
 
         # Register REST API endpoints
         logger.info("Registering REST API endpoints")
