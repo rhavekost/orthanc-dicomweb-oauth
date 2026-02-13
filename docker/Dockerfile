@@ -1,7 +1,7 @@
 FROM jodogne/orthanc-python:latest
 
-# Install Python dependencies
-RUN python3 -m pip install --no-cache-dir requests || apt-get update && apt-get install -y python3-pip && python3 -m pip install --no-cache-dir requests
+# Install Python dependencies via apt (externally-managed environment)
+RUN apt-get update && apt-get install -y python3-requests && rm -rf /var/lib/apt/lists/*
 
 # Copy plugin files
 COPY src/dicomweb_oauth_plugin.py /etc/orthanc/plugins/
