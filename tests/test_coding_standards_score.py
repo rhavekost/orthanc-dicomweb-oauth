@@ -6,7 +6,9 @@ from pathlib import Path
 def test_coding_standards_score() -> None:
     """Calculate overall coding standards score and verify A+ grade."""
     scores = {}
-    max_score = 100
+    max_score = (
+        90  # Adjusted: removed test_coverage (10 points) to avoid recursive pytest
+    )
 
     # 1. Type Safety (20 points)
     # All functions must have complete type hints
@@ -108,20 +110,6 @@ def test_coding_standards_score() -> None:
     ]
     scores["dead_code"] = 5 if len(dead_code_lines) < 5 else 3
 
-    # 8. Test Coverage (10 points)
-    # >= 80% coverage
-    coverage_result = subprocess.run(
-        ["pytest", "tests/", "--cov=src", "--cov-report=term"],
-        capture_output=True,
-        text=True,
-    )
-    match = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", coverage_result.stdout)
-    if match:
-        coverage_pct = int(match.group(1))
-        scores["test_coverage"] = 10 if coverage_pct >= 80 else 7
-    else:
-        scores["test_coverage"] = 7
-
     # Calculate total
     total_score = sum(scores.values())
     percentage = (total_score / max_score) * 100
@@ -159,8 +147,6 @@ def test_coding_standards_score() -> None:
     print(f"Documentation Coverage: {doc_coverage:.1f}%")
     print(f"Average Complexity: {avg_complexity:.2f}")
     print(f"Pylint Score: {pylint_score:.2f}/10")
-    if match:
-        print(f"Test Coverage: {coverage_pct}%")
     print(f"Dead Code Issues: {len(dead_code_lines)}")
     print("=" * 60 + "\n")
 
