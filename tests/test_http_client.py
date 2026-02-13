@@ -9,7 +9,7 @@ from src.http_client import HttpResponse, RequestsHttpClient
 class TestHttpResponse:
     """Test HttpResponse dataclass."""
 
-    def test_http_response_creation(self):
+    def test_http_response_creation(self) -> None:
         response = HttpResponse(
             status_code=200,
             json_data={"access_token": "test"},
@@ -26,8 +26,8 @@ class TestHttpResponse:
 class TestRequestsHttpClient:
     """Test default requests-based HTTP client."""
 
-    @responses.activate
-    def test_post_success(self):
+    @responses.activate  # type: ignore[misc]
+    def test_post_success(self) -> None:
         responses.add(
             responses.POST,
             "https://login.example.com/token",
@@ -47,8 +47,8 @@ class TestRequestsHttpClient:
         assert response.status_code == 200
         assert response.json_data == {"access_token": "test_token"}
 
-    @responses.activate
-    def test_post_timeout(self):
+    @responses.activate  # type: ignore[misc]
+    def test_post_timeout(self) -> None:
         responses.add(
             responses.POST,
             "https://login.example.com/token",
@@ -64,8 +64,8 @@ class TestRequestsHttpClient:
                 verify=True,
             )
 
-    @responses.activate
-    def test_get_success(self):
+    @responses.activate  # type: ignore[misc]
+    def test_get_success(self) -> None:
         responses.add(
             responses.GET,
             "https://login.example.com/keys",
