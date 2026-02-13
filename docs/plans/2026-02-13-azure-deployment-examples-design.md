@@ -6,21 +6,24 @@
 
 ## Overview
 
-This design covers comprehensive Azure deployment examples for the Orthanc DICOMweb OAuth plugin. Two complete deployment scenarios will be provided: a quickstart example for development/testing and a production example for secure, HIPAA-compliant workloads.
+This design covers comprehensive deployment examples for the Orthanc DICOMweb OAuth plugin across multiple platforms. For Azure specifically, three complete deployment scenarios will be provided: a quickstart example for development/testing, a production Container Apps example for managed PaaS workloads, and a production AKS example for Kubernetes-based deployments. Additionally, a cloud-agnostic Helm chart will be provided for deployment to any Kubernetes cluster (AKS, EKS, GKE, on-premises).
 
 ## Goals
 
 1. Provide production-ready Azure infrastructure-as-code using Bicep and Azure Verified Modules
 2. Support two authentication approaches: OAuth client credentials and Managed Identity
-3. Support two networking approaches: public endpoints and VNet with private endpoints
-4. Include comprehensive documentation, testing, and maintenance tooling
-5. Enable users to deploy a complete Orthanc environment with Azure DICOM service integration
+3. Support multiple deployment platforms: Container Apps (PaaS) and AKS (Kubernetes)
+4. Provide cloud-agnostic Helm chart for Kubernetes deployments across all cloud providers
+5. Support two networking approaches: public endpoints and VNet with private endpoints
+6. Include comprehensive documentation, testing, and maintenance tooling
+7. Enable users to deploy a complete Orthanc environment with Azure DICOM service integration
+8. Establish patterns that extend to AWS and GCP examples (future work)
 
 ## Non-Goals
 
-- Multi-cloud examples (AWS, GCP) in this design (separate efforts)
-- Kubernetes/AKS deployment (Container Apps only)
+- Multi-cloud examples (AWS, GCP) in this design (separate future efforts)
 - Multi-region disaster recovery (future enhancement)
+- On-premises deployment examples (focus on cloud providers)
 
 ## Design Decisions
 
@@ -36,33 +39,56 @@ This design covers comprehensive Azure deployment examples for the Orthanc DICOM
 
 **Folder structure:**
 ```
-examples/azure/
-├── README.md                          # Overview, comparison table
-├── docs/                              # Additional documentation
-├── test-data/                         # Sample DICOM studies
-├── quickstart/                        # Client creds + public networking
-└── production/                        # Managed Identity + VNet
+examples/
+├── kubernetes/                        # Cloud-agnostic Helm chart
+│   ├── README.md
+│   └── orthanc-oauth/                 # Helm chart
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       ├── values-azure.yaml          # Azure-specific overrides
+│       ├── values-aws.yaml            # AWS-specific overrides (future)
+│       ├── values-gcp.yaml            # GCP-specific overrides (future)
+│       └── templates/
+│
+└── azure/
+    ├── README.md                      # Overview, comparison table
+    ├── docs/                          # Additional documentation
+    ├── test-data/                     # Sample DICOM studies
+    ├── quickstart/                    # Container Apps + client creds + public
+    ├── production/                    # Container Apps + MI + VNet
+    └── production-aks/                # AKS + Helm chart + MI + VNet
 ```
 
 ### Deployment Scenarios
 
-**Decision:** Provide two complete examples rather than parameter-based variations
+**Decision:** Provide three complete Azure examples plus cloud-agnostic Kubernetes deployment
 
-**Scenarios:**
+**Azure Scenarios:**
 
-| Aspect | Quickstart | Production |
-|--------|-----------|------------|
-| **Authentication** | OAuth Client Credentials | Managed Identity |
-| **Networking** | Public endpoints + firewall rules | VNet + Private endpoints |
-| **HA/Scale** | Single instance | Multi-instance, zone-redundant |
-| **Cost** | ~$66/month | ~$300-500/month |
-| **Setup Time** | ~15 minutes | ~30 minutes |
-| **Use Case** | Dev, testing, demos | Production, HIPAA workloads |
+| Aspect | Quickstart | Production (Container Apps) | Production (AKS) |
+|--------|-----------|----------------------------|------------------|
+| **Platform** | Container Apps | Container Apps | AKS (Kubernetes) |
+| **Authentication** | OAuth Client Credentials | Managed Identity | Managed Identity |
+| **Networking** | Public endpoints + firewall | VNet + Private endpoints | VNet + Private endpoints |
+| **HA/Scale** | Single instance | Multi-instance, zone-redundant | Multi-pod, HPA, cluster autoscaler |
+| **Cost** | ~$66/month | ~$300-500/month | ~$400-600/month |
+| **Setup Time** | ~15 minutes | ~30 minutes | ~45 minutes |
+| **Complexity** | Low | Medium | High |
+| **Control** | Limited (managed service) | Limited (managed service) | Full (Kubernetes) |
+| **Use Case** | Dev, testing, demos | Production PaaS workloads | Production requiring k8s control |
+
+**Kubernetes (Cloud-Agnostic):**
+- Helm chart deployable to any Kubernetes cluster (AKS, EKS, GKE, on-prem)
+- Supports external cloud resources (managed databases, blob storage, DICOM services)
+- Supports in-cluster alternatives (PostgreSQL StatefulSet, PVCs for storage)
+- Configurable authentication methods (client credentials, managed identity, service accounts)
 
 **Rationale:**
 - Clear separation makes each example easier to understand
-- Users can choose based on their needs without complex parameter logic
-- Demonstrates both ends of the spectrum (simple vs secure)
+- Users can choose based on their needs (simplicity vs control)
+- Helm chart enables multi-cloud strategy (same deployment model on AWS EKS, GCP GKE)
+- Container Apps examples show Azure-native PaaS approach
+- AKS example demonstrates Kubernetes integration with Azure services
 
 ### Resource Architecture
 
@@ -135,23 +161,218 @@ Container App Environment
 Container App (Orthanc)
 ```
 
+#### Production AKS Example
+
+**Components deployed:**
+1. VNet with subnets (AKS nodes, AKS pods, AKS services, Private Endpoints, PostgreSQL)
+2. User-Assigned Managed Identity (for AKS workload identity)
+3. AKS Cluster (with workload identity enabled, private cluster optional)
+4. Healthcare Workspace + DICOM Service
+5. PostgreSQL Flexible Server (VNet integrated)
+6. Storage Account
+7. Key Vault
+8. Private Endpoints (DICOM, Storage, Key Vault)
+9. RBAC role assignments (MI → DICOM, Storage, PostgreSQL, Key Vault)
+10. Azure Container Registry (optional, for custom Orthanc image)
+11. Helm chart deployment (Orthanc to AKS)
+12. Optional: Log Analytics + Container Insights + Prometheus
+
+**Networking:**
+- AKS cluster in VNet with dedicated subnets
+- All PaaS services accessed via private endpoints
+- Private DNS zones for name resolution
+- NSG rules on subnets
+- Optional: Private AKS cluster (API server not publicly accessible)
+- Ingress controller for Orthanc web access (internal or public)
+
+**Kubernetes resources (deployed via Helm):**
+- Namespace: `orthanc`
+- Deployment: Orthanc pods with OAuth plugin
+- Service: ClusterIP service for Orthanc
+- ConfigMap: Orthanc configuration
+- Secret: References to Key Vault secrets (via CSI driver)
+- HorizontalPodAutoscaler: Auto-scaling based on CPU/memory
+- Ingress: NGINX or Application Gateway ingress
+- ServiceAccount: With federated credentials for workload identity
+
+**Deployment order:**
+```
+Resource Group
+  ↓
+VNet + Subnets (incl. AKS-specific subnets)
+  ↓
+Managed Identity
+  ↓
+AKS Cluster
+  ↓
+Parallel: Healthcare Workspace, PostgreSQL, Storage Account, Key Vault, ACR (optional)
+  ↓
+Private Endpoints
+  ↓
+RBAC Assignments + Federated Credentials (Workload Identity)
+  ↓
+AKS Add-ons (Key Vault CSI driver, workload identity, monitoring)
+  ↓
+Helm Chart Deployment (Orthanc)
+```
+
+### Cloud-Agnostic Helm Chart
+
+**Chart structure:**
+```
+kubernetes/orthanc-oauth/
+├── Chart.yaml                        # Chart metadata
+├── values.yaml                       # Default values
+├── values-azure.yaml                 # Azure-specific overrides
+├── values-aws.yaml                   # AWS-specific overrides (future)
+├── values-gcp.yaml                   # GCP-specific overrides (future)
+├── templates/
+│   ├── deployment.yaml               # Orthanc Deployment
+│   ├── service.yaml                  # Orthanc Service
+│   ├── configmap.yaml                # Orthanc configuration
+│   ├── secret.yaml                   # Secrets (if not using external secret store)
+│   ├── serviceaccount.yaml           # Service account for workload identity
+│   ├── hpa.yaml                      # Horizontal Pod Autoscaler
+│   ├── ingress.yaml                  # Ingress resource
+│   ├── pvc.yaml                      # PersistentVolumeClaim (optional)
+│   ├── networkpolicy.yaml            # Network policies (optional)
+│   └── _helpers.tpl                  # Template helpers
+└── README.md                         # Helm chart documentation
+```
+
+**Configuration philosophy:**
+- **Cloud-agnostic by default**: Works on any k8s cluster
+- **Cloud-specific overrides**: values-{cloud}.yaml for cloud integrations
+- **Flexible storage**: Support external blob storage OR PVCs
+- **Flexible database**: Support external managed PostgreSQL OR in-cluster StatefulSet
+- **Flexible authentication**: Client credentials, workload identity (Azure), IAM roles (AWS), service accounts (GCP)
+- **Flexible secrets**: External secret stores (Key Vault, Secrets Manager) OR Kubernetes secrets
+
+**Key values.yaml sections:**
+```yaml
+image:
+  repository: orthancteam/orthanc
+  tag: 24.12.1-full
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+database:
+  type: external              # 'external' or 'in-cluster'
+  external:
+    host: ""                  # Set in cloud-specific values
+    port: 5432
+    database: orthanc
+    sslMode: require
+    credentialsSecret: ""     # Name of k8s secret with username/password
+
+storage:
+  type: external              # 'external' or 'pvc'
+  external:
+    provider: azure-blob      # 'azure-blob', 'aws-s3', 'gcp-gcs'
+    connectionStringSecret: "" # Name of k8s secret
+    container: orthanc-dicom
+  pvc:
+    size: 100Gi
+    storageClass: ""
+
+oauthPlugin:
+  servers:
+    dicom:
+      url: ""                 # Set in cloud-specific values
+      tokenEndpoint: ""
+      scope: ""
+      authentication:
+        type: workload-identity  # 'client-credentials', 'workload-identity', 'iam-role', 'service-account'
+        clientId: ""            # For client-credentials
+        clientSecretKey: ""     # Secret key name for client-credentials
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: orthanc.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    port: 9090
+```
+
+**values-azure.yaml example:**
+```yaml
+database:
+  external:
+    host: mypostgres.postgres.database.azure.com
+    credentialsSecret: azure-postgresql-creds
+
+storage:
+  external:
+    provider: azure-blob
+    connectionStringSecret: azure-storage-creds
+    container: orthanc-dicom
+
+oauthPlugin:
+  servers:
+    dicom:
+      url: https://workspace-dicom.dicom.azurehealthcareapis.com/v2/
+      tokenEndpoint: https://login.microsoftonline.com/TENANT_ID/oauth2/v2.0/token
+      scope: https://dicom.healthcareapis.azure.com/.default
+      authentication:
+        type: workload-identity
+        clientId: MANAGED_IDENTITY_CLIENT_ID
+
+serviceAccount:
+  annotations:
+    azure.workload.identity/client-id: MANAGED_IDENTITY_CLIENT_ID
+    azure.workload.identity/tenant-id: TENANT_ID
+```
+
 ### Azure Verified Modules Used
 
 All modules referenced from Bicep Public Registry (`br/public:avm/...`):
 
+**Common across all examples:**
 - `avm/res/health-data-services/workspace` - Healthcare workspace
 - `avm/res/health-data-services/workspace/dicomservice` - DICOM service
 - `avm/res/db-for-postgre-sql/flexible-server` - PostgreSQL Flexible Server
 - `avm/res/storage/storage-account` - Storage accounts
+- `avm/res/key-vault/vault` - Key Vault
+- `avm/res/network/virtual-network` - VNet (production examples)
+- `avm/res/network/private-endpoint` - Private endpoints (production examples)
+- `avm/res/managed-identity/user-assigned-identity` - Managed Identity (production examples)
+
+**Container Apps examples (quickstart, production):**
 - `avm/res/app/container-app` - Container App
 - `avm/res/app/managed-environment` - Container App Environment
-- `avm/res/key-vault/vault` - Key Vault
-- `avm/res/network/virtual-network` - VNet (production)
-- `avm/res/network/private-endpoint` - Private endpoints (production)
-- `avm/res/managed-identity/user-assigned-identity` - Managed Identity (production)
+
+**AKS example (production-aks):**
+- `avm/res/container-service/managed-cluster` - AKS cluster
+- `avm/res/container-registry/registry` - Azure Container Registry (optional)
 
 **Custom modules (only where needed):**
-- `modules/orthanc-config.bicep` - Generates Orthanc environment variables from parameters
+- `modules/orthanc-config.bicep` - Generates Orthanc environment variables from parameters (Container Apps examples)
+- `modules/helm-values.bicep` - Generates Helm values file from parameters (AKS example)
 
 ### Parameter Design
 
@@ -174,7 +395,7 @@ All modules referenced from Bicep Public Registry (`br/public:avm/...`):
 - `clientId` - OAuth client ID (from app registration)
 - `clientSecret` - OAuth client secret (secure)
 
-**Production-specific:**
+**Production (Container Apps) specific:**
 - `vnetAddressPrefix` - VNet CIDR
 - `containerAppSubnetPrefix` - Container App subnet CIDR
 - `privateEndpointSubnetPrefix` - Private endpoint subnet CIDR
@@ -185,12 +406,40 @@ All modules referenced from Bicep Public Registry (`br/public:avm/...`):
 - `enableDiagnosticLogs` - Enable diagnostic settings
 - `logAnalyticsWorkspaceId` - Log Analytics workspace ID
 
+**Production AKS specific:**
+- `vnetAddressPrefix` - VNet CIDR
+- `aksNodeSubnetPrefix` - AKS nodes subnet CIDR
+- `aksPodSubnetPrefix` - AKS pods subnet CIDR (Azure CNI)
+- `aksServiceSubnetPrefix` - AKS services subnet CIDR
+- `privateEndpointSubnetPrefix` - Private endpoint subnet CIDR
+- `postgresSubnetPrefix` - PostgreSQL subnet CIDR
+- `aksVersion` - Kubernetes version
+- `aksNodeSize` - VM size for nodes (Standard_D4s_v3)
+- `aksNodeCount` - Initial node count
+- `aksMinNodes` - Min nodes for autoscaling
+- `aksMaxNodes` - Max nodes for autoscaling
+- `aksPrivateCluster` - Enable private AKS cluster
+- `enableContainerInsights` - Enable Container Insights monitoring
+- `deployAcr` - Deploy Azure Container Registry
+- `helmReleaseName` - Helm release name
+- `helmNamespace` - Kubernetes namespace
+
 **Parameter files provided:**
+
+Quickstart:
 - `parameters.json.template` - Template to fill in
 - `parameters.dev.example.json` - Development example
-- `parameters.demo.example.json` - Demo/training example (quickstart)
+- `parameters.demo.example.json` - Demo/training example
+
+Production (Container Apps):
+- `parameters.json.template` - Template to fill in
 - `parameters.prod.example.json` - Production example
-- `parameters.dr.example.json` - DR region example (production)
+- `parameters.dr.example.json` - DR region example
+
+Production AKS:
+- `parameters.json.template` - Template to fill in
+- `parameters.prod.example.json` - Production AKS example
+- `helm-values.yaml.template` - Helm values template
 
 ### Orthanc Configuration
 
@@ -392,57 +641,117 @@ Deploys:
 
 ## Implementation Plan
 
-### Phase 1: Core Infrastructure Templates
+### Phase 1: Cloud-Agnostic Helm Chart
 
-1. Create folder structure
-2. Implement quickstart example:
+1. Create `examples/kubernetes/` structure
+2. Implement Helm chart:
+   - `Chart.yaml` with metadata
+   - `values.yaml` with defaults
+   - `values-azure.yaml` with Azure-specific config
+   - Kubernetes templates (Deployment, Service, ConfigMap, etc.)
+   - Chart documentation
+3. Test Helm chart on local Kubernetes (kind/minikube)
+
+### Phase 2: Azure Quickstart (Container Apps)
+
+1. Create `examples/azure/quickstart/` structure
+2. Implement infrastructure:
    - `main.bicep` with AVM module references
    - `modules/orthanc-config.bicep`
    - `parameters.json.template` and examples
    - `Dockerfile`
-3. Implement production example:
+3. Implement scripts:
+   - `setup-app-registration.sh`
+   - `deploy.sh`
+   - `test-deployment.sh`
+   - `cleanup.sh`
+4. Write comprehensive README
+
+### Phase 3: Azure Production (Container Apps)
+
+1. Create `examples/azure/production/` structure
+2. Implement infrastructure:
    - `main.bicep` with VNet and MI
    - `modules/orthanc-config.bicep` and `monitoring.bicep`
    - `parameters.json.template` and examples
    - `Dockerfile`
+3. Implement scripts:
+   - `deploy.sh`
+   - `post-deployment.sh`
+   - `test-deployment.sh`
+   - `cleanup.sh`
+4. Write comprehensive README
 
-### Phase 2: Deployment Scripts
+### Phase 4: Azure Production AKS
 
-1. Quickstart scripts (setup, deploy, test, cleanup)
-2. Production scripts (deploy, post-deployment, test, cleanup)
-3. Maintenance scripts (update, rotate-secrets)
+1. Create `examples/azure/production-aks/` structure
+2. Implement infrastructure:
+   - `main.bicep` with AKS cluster and VNet
+   - `modules/helm-values.bicep`
+   - `parameters.json.template` and examples
+3. Implement scripts:
+   - `deploy.sh` (deploys Bicep + Helm)
+   - `post-deployment.sh`
+   - `test-deployment.sh`
+   - `update-helm.sh`
+   - `cleanup.sh`
+4. Write comprehensive README
 
-### Phase 3: Documentation
+### Phase 5: Documentation and Testing
 
-1. Top-level README
-2. Quickstart README
-3. Production README
-4. Additional docs (cost, scaling, backup, networking, FAQ)
+1. Top-level Azure README with comparison
+2. Kubernetes README
+3. Additional docs (cost, scaling, backup, networking, FAQ)
+4. Test data setup
+5. Automated test scripts
+6. CI/CD workflow examples
 
-### Phase 4: Testing and Validation
+### Phase 6: Maintenance Tooling
 
-1. Test data setup
-2. Automated test scripts
-3. Manual testing procedures
-4. CI/CD workflow examples
+1. Update scripts (Container Apps and AKS)
+2. Secret rotation scripts
+3. Monitoring and alerting setup
 
-### Phase 5: Optional Enhancements
+### Phase 7: Optional Enhancements
 
-1. Monitoring module
-2. Multi-region DR example
-3. Advanced scaling policies
-4. Cost optimization dashboards
+1. Multi-region DR example
+2. Advanced HPA policies for AKS
+3. Cost optimization dashboards
+4. Advanced monitoring with Grafana
 
 ## Success Criteria
 
-- [ ] Both examples deploy successfully in clean Azure subscription
-- [ ] Orthanc can authenticate to Azure DICOM service
+**Helm Chart:**
+- [ ] Helm chart deploys successfully to local Kubernetes cluster
+- [ ] Chart is configurable for different cloud providers via values files
+- [ ] Chart documentation is clear and comprehensive
+
+**Azure Quickstart (Container Apps):**
+- [ ] Deploys successfully in clean Azure subscription
+- [ ] Orthanc can authenticate to Azure DICOM service with client credentials
 - [ ] DICOM upload/query/retrieve works end-to-end
 - [ ] Web viewers (Stone, OHIF) accessible and functional
-- [ ] PostgreSQL stores Orthanc index data
-- [ ] Blob storage stores DICOM files
-- [ ] OAuth plugin successfully acquires tokens (both MI and client creds)
 - [ ] All automated tests pass
+
+**Azure Production (Container Apps):**
+- [ ] Deploys successfully with VNet and private endpoints
+- [ ] Managed Identity authentication works for all Azure services
+- [ ] No public endpoints exposed (verified)
+- [ ] Multi-instance scaling works
+- [ ] All automated tests pass
+
+**Azure Production AKS:**
+- [ ] AKS cluster deploys successfully with workload identity
+- [ ] Helm chart deploys Orthanc to AKS
+- [ ] Managed Identity authentication works via federated credentials
+- [ ] DICOM connectivity via private endpoints works
+- [ ] HPA scales pods based on load
+- [ ] All automated tests pass
+
+**Common:**
+- [ ] PostgreSQL stores Orthanc index data (all examples)
+- [ ] Blob storage stores DICOM files (all examples)
+- [ ] OAuth plugin successfully acquires tokens (all auth methods)
 - [ ] Documentation is comprehensive and accurate
 - [ ] Cleanup scripts remove all resources
 
@@ -455,7 +764,7 @@ Deploys:
 - HTTPS/TLS for all connections
 - Authentication enabled on Orthanc
 
-**Production:**
+**Production (Container Apps):**
 - No public endpoints (private endpoints only)
 - Managed Identity for all authentication (no secrets)
 - VNet isolation
@@ -464,16 +773,30 @@ Deploys:
 - Diagnostic logging enabled
 - HIPAA-aligned architecture
 
+**Production AKS:**
+- Private AKS cluster (optional, API server not public)
+- Workload Identity for pod authentication (no secrets in pods)
+- VNet isolation with dedicated subnets
+- NSG rules and Network Policies
+- Private endpoints for all Azure services
+- Azure Policy for Kubernetes (security baseline)
+- Container image scanning (ACR + Defender for Containers)
+- Pod Security Standards enforcement
+- Secrets from Key Vault via CSI driver (not in etcd)
+- RBAC enabled on cluster
+- Audit logging to Log Analytics
+- HIPAA-aligned architecture
+
 ## Cost Analysis
 
-**Quickstart (~$66/month):**
+**Quickstart (Container Apps) - ~$66/month:**
 - Healthcare DICOM Service: ~$25
 - PostgreSQL B2s: ~$15
 - Storage Account: ~$5
 - Container App (1vCPU, 2GB): ~$20
 - Key Vault: ~$1
 
-**Production (~$300-500/month):**
+**Production (Container Apps) - ~$300-500/month:**
 - Healthcare DICOM Service: ~$25
 - PostgreSQL D2s_v3 (zone-redundant): ~$150-200
 - Storage Account (geo-redundant): ~$20
@@ -482,16 +805,46 @@ Deploys:
 - Key Vault: ~$1
 - Log Analytics (optional): ~$20-50
 
+**Production AKS - ~$400-600/month:**
+- Healthcare DICOM Service: ~$25
+- PostgreSQL D2s_v3 (zone-redundant): ~$150-200
+- Storage Account (geo-redundant): ~$20
+- AKS Control Plane: Free (Uptime SLA: ~$73/month)
+- AKS Nodes (3x Standard_D4s_v3): ~$150-200
+- VNet + Private Endpoints: ~$10-20
+- Key Vault: ~$1
+- Azure Container Registry (optional): ~$5-20
+- Container Insights (optional): ~$20-50
+
+Note: AKS costs vary significantly based on node size, count, and autoscaling configuration.
+
 ## Future Enhancements
 
-- AWS deployment examples (ECS, HealthImaging)
-- GCP deployment examples (Cloud Run, Healthcare API)
-- Terraform versions of templates
-- Helm charts for Kubernetes/AKS
-- Multi-region disaster recovery
-- Auto-scaling based on metrics
-- Cost optimization dashboards
-- Advanced monitoring with Grafana
+**AWS Examples (Next Priority):**
+- Quickstart: ECS Fargate + client credentials + public endpoints
+- Production: ECS Fargate + IAM roles + VPC + private endpoints
+- Production EKS: EKS cluster + Helm chart + IAM roles for service accounts + VPC
+- Use same Helm chart with values-aws.yaml overrides
+
+**GCP Examples:**
+- Quickstart: Cloud Run + client credentials + public endpoints
+- Production: Cloud Run + service accounts + VPC + private endpoints
+- Production GKE: GKE cluster + Helm chart + workload identity + VPC
+- Use same Helm chart with values-gcp.yaml overrides
+
+**Multi-Cloud Enhancements:**
+- Terraform versions of infrastructure templates (alongside Bicep)
+- Pulumi examples for programmatic infrastructure
+- CI/CD pipelines for each cloud provider
+- Multi-cloud cost comparison dashboard
+
+**Advanced Features:**
+- Multi-region disaster recovery (active-passive and active-active)
+- Auto-scaling based on DICOM upload metrics
+- Advanced monitoring with Grafana dashboards
+- Performance testing framework
+- Backup and restore automation
+- Blue/green deployment strategies
 
 ## Questions and Risks
 
