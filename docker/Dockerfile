@@ -3,11 +3,11 @@ FROM jodogne/orthanc-python:latest
 # Install Python dependencies via apt (externally-managed environment)
 RUN apt-get update && apt-get install -y python3-requests && rm -rf /var/lib/apt/lists/*
 
-# Copy plugin files
-COPY src/dicomweb_oauth_plugin.py /etc/orthanc/plugins/
-COPY src/token_manager.py /etc/orthanc/plugins/
-COPY src/config_parser.py /etc/orthanc/plugins/
-COPY src/__init__.py /etc/orthanc/plugins/
+# Copy entire src directory to maintain package structure
+COPY src/ /etc/orthanc/plugins/src/
+
+# Set Python path to include plugin directory
+ENV PYTHONPATH=/etc/orthanc/plugins:$PYTHONPATH
 
 # Copy Orthanc configuration
 COPY docker/orthanc.json /etc/orthanc/
