@@ -69,8 +69,7 @@ We take security seriously. If you discover a security vulnerability, please fol
 
 Instead, report via:
 
-1. **Email**: security@rhavekost.com
-2. **Private Security Advisory**: Use GitHub's [private vulnerability reporting](https://github.com/rhavekost/orthanc-dicomweb-oauth/security/advisories/new)
+**Private Security Advisory**: Use GitHub's [private vulnerability reporting](https://github.com/rhavekost/orthanc-dicomweb-oauth/security/advisories/new)
 
 ### What to Include
 
@@ -207,10 +206,8 @@ This is an open-source project. Security improvements come from:
 
 ## Security Contacts
 
-- **Security Email**: security@rhavekost.com
-- **Project Maintainer**: Rob Havekost
-- **Security Advisory**: https://github.com/rhavekost/orthanc-dicomweb-oauth/security/advisories
-- **GitHub Issues**: https://github.com/rhavekost/orthanc-dicomweb-oauth/issues (for non-sensitive issues only)
+- **Security Advisory**: Use GitHub's [security advisory feature](https://github.com/rhavekost/orthanc-dicomweb-oauth/security/advisories/new) for private disclosure
+- **Public Issues**: [GitHub Issues](https://github.com/rhavekost/orthanc-dicomweb-oauth/issues) for non-sensitive issues only
 
 ---
 
