@@ -68,10 +68,10 @@ echo -e " ${GREEN}Ready!${NC}"
 
 echo -e "${YELLOW}Step 4: Testing plugin REST API endpoints...${NC}"
 
-# Test /oauth/status endpoint
-echo -n "  - Testing /oauth/status... "
-STATUS_RESPONSE=$(curl -s -u orthanc:orthanc http://localhost:$ORTHANC_PORT/oauth/status)
-if echo "$STATUS_RESPONSE" | grep -q '"plugin_loaded"'; then
+# Test /dicomweb-oauth/status endpoint
+echo -n "  - Testing /dicomweb-oauth/status... "
+STATUS_RESPONSE=$(curl -s -u orthanc:orthanc http://localhost:$ORTHANC_PORT/dicomweb-oauth/status)
+if echo "$STATUS_RESPONSE" | grep -q '"status"'; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
@@ -79,14 +79,13 @@ else
     exit 1
 fi
 
-# Test /oauth/servers endpoint
-echo -n "  - Testing /oauth/servers... "
-SERVERS_RESPONSE=$(curl -s -u orthanc:orthanc http://localhost:$ORTHANC_PORT/oauth/servers)
-if echo "$SERVERS_RESPONSE" | grep -q '"servers"'; then
+# Test server configuration
+echo -n "  - Verifying server configuration... "
+if echo "$STATUS_RESPONSE" | grep -q '"servers_configured"'; then
     echo -e "${GREEN}✓${NC}"
 else
     echo -e "${RED}✗${NC}"
-    echo "Response: $SERVERS_RESPONSE"
+    echo "Response: $STATUS_RESPONSE"
     exit 1
 fi
 
