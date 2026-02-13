@@ -19,4 +19,4 @@ EXPOSE 8042 4242
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8042/system || exit 1
 
-CMD ["Orthanc", "/etc/orthanc/orthanc.json"]
+CMD ["/etc/orthanc/"]
