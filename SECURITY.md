@@ -4,10 +4,7 @@
 
 | Version | Supported          | Security Updates |
 | ------- | ------------------ | ---------------- |
-| 2.1.x   | :white_check_mark: | Yes              |
-| 2.0.x   | :white_check_mark: | Yes              |
-| 1.0.x   | :x:                | No (Upgrade to 2.1.x) |
-| < 1.0   | :x:                | No               |
+| main    | :white_check_mark: | Yes              |
 
 ## Security Status
 
@@ -182,13 +179,12 @@ See [HIPAA Compliance Guide](docs/compliance/HIPAA-COMPLIANCE.md) for evidence a
 
 ### Other Compliance Frameworks
 
-- **SOC 2 Type II**: Documentation in progress (Target: Q3 2026)
-- **ISO 27001**: Under consideration
-- **GDPR**: Privacy documentation in progress (Target: Q2 2026)
+- **SOC 2 Type II**: Not planned
+- **ISO 27001**: Not planned
+- **GDPR**: Privacy-focused by design (no personal data collection)
 
-## Security Roadmap
+## Security Features Implemented
 
-### Completed (v2.0.0 - v2.1.0)
 - ✅ JWT signature validation
 - ✅ Rate limiting protection
 - ✅ Comprehensive audit logging with correlation IDs
@@ -197,17 +193,17 @@ See [HIPAA Compliance Guide](docs/compliance/HIPAA-COMPLIANCE.md) for evidence a
 - ✅ Configuration schema validation
 - ✅ Secure defaults in production configs
 - ✅ SSL/TLS certificate verification
+- ✅ Automated dependency scanning (Dependabot)
+- ✅ Static security analysis (Bandit, CodeQL)
+- ✅ Pre-commit security hooks
 
-### In Progress
-- 🔄 Third-party security audit (Scheduled: Q2 2026)
-- 🔄 Penetration testing (Scheduled: Q2 2026)
-- 🔄 SOC 2 Type II preparation
+### Community Security
 
-### Future (Q3-Q4 2026)
-- [ ] Security certifications (SOC 2, ISO 27001)
-- [ ] FIPS 140-2 compliance for cryptographic modules
-- [ ] Advanced threat detection and response
-- [ ] Security information and event management (SIEM) integration
+This is an open-source project. Security improvements come from:
+- Community security reviews and issue reports
+- Automated security scanning in CI/CD
+- Following security best practices in development
+- Regular dependency updates
 
 ## Security Contacts
 
