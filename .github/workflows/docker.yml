@@ -88,6 +88,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Check out code
