@@ -9,9 +9,7 @@
     "orthanc": "orthanc"
   },
 
-  "Plugins": [
-    "/etc/orthanc/plugins/dicomweb_oauth_plugin.py"
-  ],
+  "PythonScript": "/etc/orthanc/plugins/dicomweb_oauth_plugin.py",
 
   "DicomWeb": {
     "Enable": true,

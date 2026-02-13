@@ -1,4 +1,4 @@
-FROM orthancteam/orthanc:latest
+FROM jodogne/orthanc-python:latest
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --break-system-packages requests
