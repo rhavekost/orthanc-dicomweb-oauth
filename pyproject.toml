@@ -48,7 +48,7 @@ exclude_dirs = [
 ]
 skips = [
     "B101",  # assert_used (used in tests)
-    # B105 excluded in CI workflow, but pre-commit uses older Bandit
+    "B105",  # hardcoded_password_string (too many false positives)
 ]
 
 [tool.pydocstyle]
