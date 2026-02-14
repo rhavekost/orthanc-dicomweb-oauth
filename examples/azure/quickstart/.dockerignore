@@ -1,0 +1,14 @@
+# .dockerignore
+*.md
+.git
+.gitignore
+tests/
+docs/
+examples/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
