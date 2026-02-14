@@ -257,26 +257,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
             secretRef: 'orthanc-password'
           }
         ]
-        probes: [
-          {
-            type: 'Liveness'
-            httpGet: {
-              path: '/system'
-              port: 8042
-            }
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          }
-          {
-            type: 'Readiness'
-            httpGet: {
-              path: '/system'
-              port: 8042
-            }
-            initialDelaySeconds: 10
-            periodSeconds: 5
-          }
-        ]
+        // Health probes removed - Orthanc requires authentication which Container Apps probes don't support
+        // For production, consider creating an unauthenticated health endpoint
       }
     ]
     secrets: {
