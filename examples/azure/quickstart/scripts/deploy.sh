@@ -238,6 +238,10 @@ log_step "Step 4/6: Generating deployment parameters"
 # Read DICOM service URL from parameters file
 DICOM_SERVICE_URL=$(jq -r '.parameters.dicomServiceUrl.value' "$PARAMETERS_FILE")
 
+# Get ACR admin password
+log_info "Retrieving Azure Container Registry credentials"
+ACR_PASSWORD=$(az acr credential show --name "$CONTAINER_REGISTRY" --query "passwords[0].value" -o tsv)
+
 # Initialize password variables
 POSTGRES_PASSWORD=""
 ORTHANC_PASSWORD=""
@@ -267,20 +271,21 @@ fi
 # Create deployment parameters
 cat > deployment-params.json << EOF
 {
-  "environmentName": "$ENVIRONMENT_NAME",
-  "location": "$LOCATION",
-  "resourceGroupName": "$RESOURCE_GROUP",
-  "containerImage": "$CONTAINER_IMAGE",
-  "containerRegistryName": "$CONTAINER_REGISTRY",
-  "dicomServiceUrl": "$DICOM_SERVICE_URL",
-  "tenantId": "$TENANT_ID",
-  "dicomScope": "$DICOM_SCOPE",
-  "oauthClientId": "$CLIENT_ID",
-  "oauthClientSecret": "$CLIENT_SECRET",
-  "postgresAdminUsername": "orthanc_admin",
-  "postgresAdminPassword": "$POSTGRES_PASSWORD",
-  "orthancUsername": "admin",
-  "orthancPassword": "$ORTHANC_PASSWORD"
+  "environmentName": {"value": "$ENVIRONMENT_NAME"},
+  "location": {"value": "$LOCATION"},
+  "resourceGroupName": {"value": "$RESOURCE_GROUP"},
+  "containerImage": {"value": "$CONTAINER_IMAGE"},
+  "containerRegistryName": {"value": "$CONTAINER_REGISTRY"},
+  "containerRegistryPassword": {"value": "$ACR_PASSWORD"},
+  "dicomServiceUrl": {"value": "$DICOM_SERVICE_URL"},
+  "tenantId": {"value": "$TENANT_ID"},
+  "dicomScope": {"value": "$DICOM_SCOPE"},
+  "oauthClientId": {"value": "$CLIENT_ID"},
+  "oauthClientSecret": {"value": "$CLIENT_SECRET"},
+  "postgresAdminUsername": {"value": "orthanc_admin"},
+  "postgresAdminPassword": {"value": "$POSTGRES_PASSWORD"},
+  "orthancUsername": {"value": "admin"},
+  "orthancPassword": {"value": "$ORTHANC_PASSWORD"}
 }
 EOF
 

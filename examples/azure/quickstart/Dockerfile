@@ -19,6 +19,9 @@ RUN apt-get update && \
 COPY src/ /etc/orthanc/plugins/src/
 COPY schemas/ /etc/orthanc/plugins/schemas/
 
+# Copy Orthanc configuration (enables remote access)
+COPY examples/azure/quickstart/orthanc.json /etc/orthanc/orthanc.json
+
 # Set PYTHONPATH for plugin imports
 ENV PYTHONPATH="/etc/orthanc/plugins:${PYTHONPATH}"
 ENV ORTHANC__PLUGINS='["/etc/orthanc/plugins/src/dicomweb_oauth_plugin.py"]'
@@ -30,7 +33,5 @@ EXPOSE 8042 4242
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD curl -f http://localhost:8042/system || exit 1
 
-# Run as non-root user
-USER orthanc
-
-CMD ["Orthanc", "/etc/orthanc/"]
+# The base image handles user switching via entrypoint
+CMD ["/etc/orthanc/"]

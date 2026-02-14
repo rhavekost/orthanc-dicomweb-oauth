@@ -38,3 +38,6 @@ examples/azure/quickstart/modules/*.json
 
 # Azure production deployment parameters (contains sensitive Key Vault references)
 examples/azure/production/parameters.json
+examples/azure/quickstart/scripts/deployment-params.json
+examples/azure/quickstart/scripts/deployment-output.json
+examples/azure/quickstart/scripts/deployment-details.json

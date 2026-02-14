@@ -19,6 +19,10 @@ param containerImage string
 @description('The name of the Azure Container Registry')
 param containerRegistryName string
 
+@description('Azure Container Registry admin password')
+@secure()
+param containerRegistryPassword string
+
 @description('The URL of the DICOM service')
 param dicomServiceUrl string
 
@@ -143,6 +147,7 @@ module postgres 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.8.0' = {
     version: '15'
     administratorLogin: postgresAdminUsername
     administratorLoginPassword: postgresAdminPassword
+    highAvailability: 'Disabled'
     databases: [
       {
         name: 'orthanc'
@@ -170,6 +175,7 @@ module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1
     location: location
     tags: tags
     logAnalyticsWorkspaceResourceId: logAnalytics.outputs.resourceId
+    zoneRedundant: false
   }
 }
 
@@ -291,6 +297,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
           name: 'orthanc-password'
           value: orthancPassword
         }
+        {
+          name: 'acr-password'
+          value: containerRegistryPassword
+        }
       ]
     }
     ingressExternal: true
@@ -314,7 +324,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
     registries: [
       {
         server: '${containerRegistryName}.azurecr.io'
-        identity: 'system'
+        username: containerRegistryName
+        passwordSecretRef: 'acr-password'
       }
     ]
     managedIdentities: {
@@ -327,16 +338,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
 // Role Assignments
 // ========================================
 
-// Grant Container App system identity ACR Pull role
-module acrPullRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.1' = {
-  scope: rg
-  name: 'acrPullRoleAssignment'
-  params: {
-    principalId: containerApp.outputs.systemAssignedMIPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
-    resourceId: subscriptionResourceId('Microsoft.ContainerRegistry/registries', containerRegistryName)
-  }
-}
+// NOTE: ACR Pull role assignment not needed when using admin credentials
+// Container App uses username/password authentication for ACR
 
 // ========================================
 // Outputs

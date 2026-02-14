@@ -275,23 +275,23 @@ fi
 # Create deployment parameters
 cat > deployment-params.json << EOF
 {
-  "environmentName": "$ENVIRONMENT_NAME",
-  "location": "$LOCATION",
-  "resourceGroupName": "$RESOURCE_GROUP",
-  "vnetAddressPrefix": "$VNET_ADDRESS_PREFIX",
-  "containerAppsSubnetPrefix": "$CONTAINER_APPS_SUBNET",
-  "privateEndpointsSubnetPrefix": "$PRIVATE_ENDPOINTS_SUBNET",
-  "containerImage": "$CONTAINER_IMAGE",
-  "containerRegistryName": "$CONTAINER_REGISTRY",
-  "containerRegistryResourceGroup": "$CONTAINER_REGISTRY_RG",
-  "dicomServiceUrl": "$DICOM_SERVICE_URL",
-  "dicomScope": "https://dicom.healthcareapis.azure.com/.default",
-  "postgresAdminUsername": "orthanc_admin",
-  "postgresAdminPassword": "$POSTGRES_PASSWORD",
-  "orthancUsername": "admin",
-  "orthancPassword": "$ORTHANC_PASSWORD",
-  "enablePrivateEndpoints": true,
-  "enableNetworkIsolation": true
+  "environmentName": {"value": "$ENVIRONMENT_NAME"},
+  "location": {"value": "$LOCATION"},
+  "resourceGroupName": {"value": "$RESOURCE_GROUP"},
+  "vnetAddressPrefix": {"value": "$VNET_ADDRESS_PREFIX"},
+  "containerAppsSubnetPrefix": {"value": "$CONTAINER_APPS_SUBNET"},
+  "privateEndpointsSubnetPrefix": {"value": "$PRIVATE_ENDPOINTS_SUBNET"},
+  "containerImage": {"value": "$CONTAINER_IMAGE"},
+  "containerRegistryName": {"value": "$CONTAINER_REGISTRY"},
+  "containerRegistryResourceGroup": {"value": "$CONTAINER_REGISTRY_RG"},
+  "dicomServiceUrl": {"value": "$DICOM_SERVICE_URL"},
+  "dicomScope": {"value": "https://dicom.healthcareapis.azure.com/.default"},
+  "postgresAdminUsername": {"value": "orthanc_admin"},
+  "postgresAdminPassword": {"value": "$POSTGRES_PASSWORD"},
+  "orthancUsername": {"value": "admin"},
+  "orthancPassword": {"value": "$ORTHANC_PASSWORD"},
+  "enablePrivateEndpoints": {"value": true},
+  "enableNetworkIsolation": {"value": true}
 }
 EOF
 
