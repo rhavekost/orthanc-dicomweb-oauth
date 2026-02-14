@@ -48,6 +48,9 @@ database:
   # WARNING: Not recommended for production - no automatic backups, limited HA
   inCluster:
     enabled: false
+    port: 5432
+    database: orthanc
+    sslMode: disable
     storageSize: 20Gi
     storageClass: ""
 

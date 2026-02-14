@@ -61,11 +61,22 @@ Create the name of the service account to use
 
 {{/*
 Database connection string for Orthanc
+Note: Username and password are passed via environment variables for security
 */}}
 {{- define "orthanc-oauth.databaseConnectionString" -}}
 {{- if eq .Values.database.type "external" }}
-{{- printf "host=%s port=%d dbname=%s sslmode=%s" .Values.database.external.host (.Values.database.external.port | int) .Values.database.external.database .Values.database.external.sslMode }}
+{{- $host := required "database.external.host is required when database.type is 'external'" .Values.database.external.host }}
+{{- $port := required "database.external.port is required when database.type is 'external'" .Values.database.external.port }}
+{{- $dbname := required "database.external.database is required when database.type is 'external'" .Values.database.external.database }}
+{{- $sslMode := required "database.external.sslMode is required when database.type is 'external'" .Values.database.external.sslMode }}
+{{- printf "host=%s port=%d dbname=%s sslmode=%s" $host ($port | int) $dbname $sslMode }}
+{{- else if eq .Values.database.type "in-cluster" }}
+{{- $host := printf "%s-postgresql" (include "orthanc-oauth.fullname" .) }}
+{{- $port := .Values.database.inCluster.port | default 5432 | int }}
+{{- $dbname := .Values.database.inCluster.database | default "orthanc" }}
+{{- $sslMode := .Values.database.inCluster.sslMode | default "disable" }}
+{{- printf "host=%s port=%d dbname=%s sslmode=%s" $host $port $dbname $sslMode }}
 {{- else }}
-{{- printf "host=%s-postgresql port=5432 dbname=orthanc sslmode=disable" (include "orthanc-oauth.fullname" .) }}
+{{- fail "database.type must be either 'external' or 'in-cluster'" }}
 {{- end }}
 {{- end }}
