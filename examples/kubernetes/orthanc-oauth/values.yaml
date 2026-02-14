@@ -1,0 +1,215 @@
+# Default values for orthanc-oauth
+# This is a YAML-formatted file.
+
+# Orthanc container image configuration
+image:
+  repository: orthancteam/orthanc
+  tag: "24.12.1-full"
+  pullPolicy: IfNotPresent
+  # pullSecrets: []
+
+# Number of replicas
+replicaCount: 2
+
+# Resource limits and requests
+resources:
+  requests:
+    cpu: 1000m
+    memory: 2Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+
+# Horizontal Pod Autoscaler configuration
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Database configuration
+database:
+  # Type: 'external' for managed cloud database, 'in-cluster' for StatefulSet
+  type: external
+
+  external:
+    # Database connection details
+    host: ""  # Required: PostgreSQL host (e.g., mydb.postgres.database.azure.com)
+    port: 5432
+    database: orthanc
+    sslMode: require
+    # Kubernetes secret containing 'username' and 'password' keys
+    credentialsSecret: ""  # Required: name of secret
+
+  # In-cluster PostgreSQL (for development/testing only)
+  inCluster:
+    enabled: false
+    storageSize: 20Gi
+    storageClass: ""
+
+# Storage configuration for DICOM files
+storage:
+  # Type: 'external' for cloud blob storage, 'pvc' for persistent volume
+  type: external
+
+  external:
+    # Provider: 'azure-blob', 'aws-s3', 'gcp-gcs'
+    provider: azure-blob
+    # Kubernetes secret containing connection string or credentials
+    connectionStringSecret: ""  # Required: name of secret
+    # Container/bucket name
+    container: orthanc-dicom
+
+  # Persistent Volume Claim (alternative to cloud storage)
+  pvc:
+    enabled: false
+    size: 100Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+# OAuth plugin configuration
+oauthPlugin:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  logLevel: INFO
+
+  # Rate limiting
+  rateLimitRequests: 100
+  rateLimitWindowSeconds: 60
+
+  # Servers configuration
+  servers:
+    dicom:
+      # DICOM service URL
+      url: ""  # Required: e.g., https://workspace.dicom.azurehealthcareapis.com/v2/
+      # OAuth token endpoint
+      tokenEndpoint: ""  # Required: e.g., https://login.microsoftonline.com/TENANT/oauth2/v2.0/token
+      # OAuth scope
+      scope: ""  # Required: e.g., https://dicom.healthcareapis.azure.com/.default
+      # Token refresh buffer (seconds)
+      tokenRefreshBufferSeconds: 300
+
+      # Authentication configuration
+      authentication:
+        # Type: 'client-credentials', 'workload-identity', 'iam-role', 'service-account'
+        type: workload-identity
+        # For client-credentials only
+        clientId: ""
+        clientSecretKey: ""  # Key name in clientSecretSecret
+        clientSecretSecret: ""  # Secret name containing client secret
+
+# Orthanc core configuration
+orthanc:
+  # Enable remote access
+  remoteAccessAllowed: true
+  # Enable authentication
+  authenticationEnabled: true
+  # Registered users (username: password)
+  registeredUsers: {}
+    # admin: "changeme"
+
+  # HTTP server configuration
+  httpPort: 8042
+  httpCompression: true
+  httpThreadsCount: 50
+
+  # DICOM configuration
+  dicomAet: "ORTHANC"
+  dicomPort: 4242
+  dicomThreadsCount: 4
+
+# Service configuration
+service:
+  type: ClusterIP
+  httpPort: 8042
+  dicomPort: 4242
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: orthanc.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: orthanc-tls
+    #   hosts:
+    #     - orthanc.example.com
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+    # For Azure Workload Identity:
+    # azure.workload.identity/client-id: MANAGED_IDENTITY_CLIENT_ID
+    # azure.workload.identity/tenant-id: TENANT_ID
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+  # For Azure Workload Identity:
+  # azure.workload.identity/use: "true"
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    port: 9090
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+
+# Network policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Liveness and readiness probes
+livenessProbe:
+  httpGet:
+    path: /system
+    port: 8042
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /system
+    port: 8042
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
