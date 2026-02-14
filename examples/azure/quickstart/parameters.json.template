@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "quickstart"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "resourceGroupName": {
+      "value": "rg-orthanc-quickstart"
+    },
+    "containerImage": {
+      "value": "REPLACE_WITH_YOUR_REGISTRY.azurecr.io/orthanc-oauth:latest"
+    },
+    "containerRegistryName": {
+      "value": "REPLACE_WITH_YOUR_REGISTRY_NAME"
+    },
+    "dicomServiceUrl": {
+      "value": "REPLACE_WITH_YOUR_DICOM_SERVICE_URL"
+    },
+    "tenantId": {
+      "value": "REPLACE_WITH_YOUR_TENANT_ID"
+    },
+    "dicomScope": {
+      "value": "https://dicom.healthcareapis.azure.com/.default"
+    },
+    "oauthClientId": {
+      "value": "REPLACE_WITH_YOUR_CLIENT_ID"
+    },
+    "oauthClientSecret": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RG_NAME/providers/Microsoft.KeyVault/vaults/VAULT_NAME"
+        },
+        "secretName": "oauth-client-secret"
+      }
+    },
+    "postgresAdminUsername": {
+      "value": "orthanc_admin"
+    },
+    "postgresAdminPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RG_NAME/providers/Microsoft.KeyVault/vaults/VAULT_NAME"
+        },
+        "secretName": "postgres-admin-password"
+      }
+    },
+    "orthancUsername": {
+      "value": "admin"
+    },
+    "orthancPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RG_NAME/providers/Microsoft.KeyVault/vaults/VAULT_NAME"
+        },
+        "secretName": "orthanc-admin-password"
+      }
+    },
+    "tags": {
+      "value": {
+        "Environment": "Quickstart",
+        "Project": "Orthanc-OAuth",
+        "ManagedBy": "Bicep"
+      }
+    }
+  }
+}
