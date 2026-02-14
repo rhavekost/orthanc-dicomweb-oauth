@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "orthanc-oauth.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "orthanc-oauth.labels" . | nindent 4 }}
+data:
+  # Orthanc core configuration
+  orthanc.json: |
+    {
+      "Name": "{{ .Values.orthanc.dicomAet }}",
+      "RemoteAccessAllowed": {{ .Values.orthanc.remoteAccessAllowed }},
+      "AuthenticationEnabled": {{ .Values.orthanc.authenticationEnabled }},
+      {{- if .Values.orthanc.registeredUsers }}
+      "RegisteredUsers": {{ .Values.orthanc.registeredUsers | toJson }},
+      {{- end }}
+      "HttpPort": {{ .Values.orthanc.httpPort }},
+      "HttpCompressionEnabled": {{ .Values.orthanc.httpCompression }},
+      "HttpThreadsCount": {{ .Values.orthanc.httpThreadsCount }},
+      "DicomAet": "{{ .Values.orthanc.dicomAet }}",
+      "DicomPort": {{ .Values.orthanc.dicomPort }},
+      "DicomThreadsCount": {{ .Values.orthanc.dicomThreadsCount }},
+      "Plugins": ["/etc/orthanc/plugins/dicomweb_oauth_plugin.py"]
+    }
+
+  # OAuth plugin configuration
+  dicomweb-oauth.json: |
+    {
+      "DicomWebOAuth": {
+        "ConfigVersion": "2.0",
+        "LogLevel": "{{ .Values.oauthPlugin.logLevel }}",
+        "RateLimitRequests": {{ .Values.oauthPlugin.rateLimitRequests }},
+        "RateLimitWindowSeconds": {{ .Values.oauthPlugin.rateLimitWindowSeconds }},
+        "Servers": {
+          {{- range $name, $server := .Values.oauthPlugin.servers }}
+          "{{ $name }}": {
+            "Url": "{{ $server.url }}",
+            "TokenEndpoint": "{{ $server.tokenEndpoint }}",
+            "Scope": "{{ $server.scope }}",
+            "TokenRefreshBufferSeconds": {{ $server.tokenRefreshBufferSeconds | default 300 }},
+            {{- if eq $server.authentication.type "client-credentials" }}
+            "ClientId": "${OAUTH_CLIENT_ID}",
+            "ClientSecret": "${OAUTH_CLIENT_SECRET}",
+            {{- else if eq $server.authentication.type "workload-identity" }}
+            "UseManagedIdentity": true,
+            {{- end }}
+            "VerifySSL": true
+          }{{ if not (last $name $.Values.oauthPlugin.servers) }},{{ end }}
+          {{- end }}
+        }
+      }
+    }
