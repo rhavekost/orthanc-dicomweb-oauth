@@ -1,0 +1,222 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "3588132510305708272"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The Azure region for resources"
+      }
+    },
+    "namePrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "The name prefix for networking resources"
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/16",
+      "metadata": {
+        "description": "VNet address prefix"
+      }
+    },
+    "containerAppsSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.1.0/24",
+      "metadata": {
+        "description": "Container Apps subnet address prefix"
+      }
+    },
+    "privateEndpointsSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.2.0/24",
+      "metadata": {
+        "description": "Private Endpoints subnet address prefix"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Resource tags"
+      }
+    }
+  },
+  "variables": {
+    "vnetName": "[format('{0}-vnet', parameters('namePrefix'))]",
+    "containerAppsSubnetName": "snet-containerApps",
+    "privateEndpointsSubnetName": "snet-privateEndpoints",
+    "containerAppsNsgName": "[format('{0}-nsg-containerApps', parameters('namePrefix'))]",
+    "privateEndpointsNsgName": "[format('{0}-nsg-privateEndpoints', parameters('namePrefix'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('containerAppsNsgName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "AllowHTTPSInbound",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*"
+            }
+          },
+          {
+            "name": "AllowVnetInbound",
+            "properties": {
+              "priority": 110,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork"
+            }
+          },
+          {
+            "name": "DenyAllInbound",
+            "properties": {
+              "priority": 4096,
+              "direction": "Inbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('privateEndpointsNsgName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "AllowVnetInbound",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork"
+            }
+          },
+          {
+            "name": "DenyAllInbound",
+            "properties": {
+              "priority": 4096,
+              "direction": "Inbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-11-01",
+      "name": "[variables('vnetName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('containerAppsSubnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('containerAppsSubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('containerAppsNsgName'))]"
+              },
+              "delegations": [
+                {
+                  "name": "Microsoft.App.environments",
+                  "properties": {
+                    "serviceName": "Microsoft.App/environments"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "[variables('privateEndpointsSubnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('privateEndpointsSubnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('privateEndpointsNsgName'))]"
+              },
+              "privateEndpointNetworkPolicies": "Disabled"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('containerAppsNsgName'))]",
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('privateEndpointsNsgName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "vnetId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+    },
+    "vnetName": {
+      "type": "string",
+      "value": "[variables('vnetName')]"
+    },
+    "containerAppsSubnetId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), '2023-11-01').subnets[0].id]"
+    },
+    "privateEndpointsSubnetId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), '2023-11-01').subnets[1].id]"
+    },
+    "containerAppsSubnetName": {
+      "type": "string",
+      "value": "[variables('containerAppsSubnetName')]"
+    },
+    "privateEndpointsSubnetName": {
+      "type": "string",
+      "value": "[variables('privateEndpointsSubnetName')]"
+    }
+  }
+}
