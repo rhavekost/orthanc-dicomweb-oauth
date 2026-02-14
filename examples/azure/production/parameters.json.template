@@ -1,6 +1,7 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
+  "_comment": "ARM/Bicep JSON Parameters Template for Production Deployment. This file provides parameter definitions for deploying Orthanc with OAuth to Azure using Azure CLI or PowerShell with JSON parameters. REQUIRED CUSTOMIZATIONS: Replace all REPLACE_WITH_* and YOUR_* placeholders with your actual values. Update Key Vault references with your subscription ID, resource group, and vault name. USAGE: Copy this file to parameters.json, fill in your values, then deploy with: az deployment group create --resource-group rg-orthanc-production --template-file main.bicep --parameters parameters.json. WARNING: Do not commit parameters.json to version control as it contains sensitive Key Vault paths.",
   "parameters": {
     "environmentName": {
       "value": "production"

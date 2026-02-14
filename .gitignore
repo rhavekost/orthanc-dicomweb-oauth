@@ -35,3 +35,6 @@ secrets/
 # Azure Bicep build artifacts
 examples/azure/quickstart/*.json
 examples/azure/quickstart/modules/*.json
+
+# Azure production deployment parameters (contains sensitive Key Vault references)
+examples/azure/production/parameters.json
