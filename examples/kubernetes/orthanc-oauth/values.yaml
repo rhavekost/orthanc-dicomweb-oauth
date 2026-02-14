@@ -12,6 +12,7 @@ image:
 replicaCount: 2
 
 # Resource limits and requests
+# These are baseline values - adjust based on your imaging workload and concurrent users
 resources:
   requests:
     cpu: 1000m
@@ -21,6 +22,7 @@ resources:
     memory: 4Gi
 
 # Horizontal Pod Autoscaler configuration
+# When enabled, replicaCount above is used only as initial value
 autoscaling:
   enabled: true
   minReplicas: 2
@@ -43,6 +45,7 @@ database:
     credentialsSecret: ""  # Required: name of secret
 
   # In-cluster PostgreSQL (for development/testing only)
+  # WARNING: Not recommended for production - no automatic backups, limited HA
   inCluster:
     enabled: false
     storageSize: 20Gi
@@ -106,7 +109,7 @@ orthanc:
   authenticationEnabled: true
   # Registered users (username: password)
   registeredUsers: {}
-    # admin: "changeme"
+    # admin: "<GENERATE_SECURE_PASSWORD>"  # Use secrets management in production
 
   # HTTP server configuration
   httpPort: 8042
@@ -196,6 +199,8 @@ networkPolicy:
     - Egress
 
 # Liveness and readiness probes
+# Note: /system endpoint requires authentication if authenticationEnabled: true
+# Ensure orthanc.registeredUsers is configured or use anonymous access for probes
 livenessProbe:
   httpGet:
     path: /system
