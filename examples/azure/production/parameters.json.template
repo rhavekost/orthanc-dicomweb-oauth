@@ -1,0 +1,75 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "production"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "resourceGroupName": {
+      "value": "rg-orthanc-production"
+    },
+    "vnetAddressPrefix": {
+      "value": "10.0.0.0/16"
+    },
+    "containerAppsSubnetPrefix": {
+      "value": "10.0.1.0/24"
+    },
+    "privateEndpointsSubnetPrefix": {
+      "value": "10.0.2.0/24"
+    },
+    "containerImage": {
+      "value": "REPLACE_WITH_YOUR_REGISTRY.azurecr.io/orthanc-oauth:latest"
+    },
+    "containerRegistryName": {
+      "value": "REPLACE_WITH_YOUR_REGISTRY_NAME"
+    },
+    "containerRegistryResourceGroup": {
+      "value": "REPLACE_WITH_ACR_RESOURCE_GROUP"
+    },
+    "dicomServiceUrl": {
+      "value": "REPLACE_WITH_YOUR_DICOM_SERVICE_URL"
+    },
+    "dicomScope": {
+      "value": "https://dicom.healthcareapis.azure.com/.default"
+    },
+    "postgresAdminUsername": {
+      "value": "orthanc_admin"
+    },
+    "postgresAdminPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RG_NAME/providers/Microsoft.KeyVault/vaults/VAULT_NAME"
+        },
+        "secretName": "postgres-admin-password"
+      }
+    },
+    "orthancUsername": {
+      "value": "admin"
+    },
+    "orthancPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "/subscriptions/SUBSCRIPTION_ID/resourceGroups/RG_NAME/providers/Microsoft.KeyVault/vaults/VAULT_NAME"
+        },
+        "secretName": "orthanc-admin-password"
+      }
+    },
+    "enablePrivateEndpoints": {
+      "value": true
+    },
+    "enableNetworkIsolation": {
+      "value": true
+    },
+    "tags": {
+      "value": {
+        "Environment": "Production",
+        "Project": "Orthanc-OAuth",
+        "ManagedBy": "Bicep",
+        "Compliance": "HIPAA"
+      }
+    }
+  }
+}
