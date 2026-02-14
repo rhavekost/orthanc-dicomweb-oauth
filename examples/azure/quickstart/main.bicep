@@ -331,7 +331,7 @@ module acrPullRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assi
   params: {
     principalId: containerApp.outputs.systemAssignedMIPrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
-    resourceId: resourceId('Microsoft.ContainerRegistry/registries', containerRegistryName)
+    resourceId: subscriptionResourceId('Microsoft.ContainerRegistry/registries', containerRegistryName)
   }
 }
 
