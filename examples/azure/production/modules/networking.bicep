@@ -80,6 +80,32 @@ resource containerAppsNsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' =
           destinationAddressPrefix: '*'
         }
       }
+      {
+        name: 'AllowAzureCloudOutbound'
+        properties: {
+          priority: 200
+          direction: 'Outbound'
+          access: 'Allow'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
+          destinationAddressPrefix: 'AzureCloud'
+        }
+      }
+      {
+        name: 'AllowInternetOutbound'
+        properties: {
+          priority: 210
+          direction: 'Outbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourcePortRange: '*'
+          destinationPortRange: '443'
+          sourceAddressPrefix: 'VirtualNetwork'
+          destinationAddressPrefix: 'Internet'
+        }
+      }
     ]
   }
 }
@@ -115,6 +141,19 @@ resource privateEndpointsNsg 'Microsoft.Network/networkSecurityGroups@2023-11-01
           destinationPortRange: '*'
           sourceAddressPrefix: '*'
           destinationAddressPrefix: '*'
+        }
+      }
+      {
+        name: 'AllowVnetOutbound'
+        properties: {
+          priority: 200
+          direction: 'Outbound'
+          access: 'Allow'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: 'VirtualNetwork'
+          destinationAddressPrefix: 'VirtualNetwork'
         }
       }
     ]
