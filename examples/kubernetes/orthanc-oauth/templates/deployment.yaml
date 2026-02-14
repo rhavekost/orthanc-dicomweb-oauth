@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orthanc-oauth.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "orthanc-oauth.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "orthanc-oauth.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "orthanc-oauth.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "orthanc-oauth.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: orthanc
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.orthanc.httpPort }}
+          protocol: TCP
+        - name: dicom
+          containerPort: {{ .Values.orthanc.dicomPort }}
+          protocol: TCP
+        {{- if .Values.monitoring.enabled }}
+        - name: metrics
+          containerPort: {{ .Values.monitoring.prometheus.port }}
+          protocol: TCP
+        {{- end }}
+        env:
+        # Database configuration
+        - name: ORTHANC__POSTGRESQL__HOST
+          value: "{{ .Values.database.external.host }}"
+        - name: ORTHANC__POSTGRESQL__PORT
+          value: "{{ .Values.database.external.port }}"
+        - name: ORTHANC__POSTGRESQL__DATABASE
+          value: "{{ .Values.database.external.database }}"
+        - name: ORTHANC__POSTGRESQL__USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.external.credentialsSecret }}
+              key: username
+        - name: ORTHANC__POSTGRESQL__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.external.credentialsSecret }}
+              key: password
+
+        # Storage configuration
+        {{- if eq .Values.storage.type "external" }}
+        {{- if eq .Values.storage.external.provider "azure-blob" }}
+        - name: ORTHANC__AZURE_BLOB_STORAGE__CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.storage.external.connectionStringSecret }}
+              key: connectionString
+        - name: ORTHANC__AZURE_BLOB_STORAGE__CONTAINER
+          value: "{{ .Values.storage.external.container }}"
+        {{- end }}
+        {{- end }}
+
+        # OAuth plugin configuration
+        {{- range $name, $server := .Values.oauthPlugin.servers }}
+        {{- if eq $server.authentication.type "client-credentials" }}
+        - name: OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ $server.authentication.clientSecretSecret }}
+              key: clientId
+        - name: OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ $server.authentication.clientSecretSecret }}
+              key: {{ $server.authentication.clientSecretKey }}
+        {{- else if eq $server.authentication.type "workload-identity" }}
+        - name: AZURE_CLIENT_ID
+          value: "{{ $server.authentication.clientId }}"
+        {{- end }}
+        {{- end }}
+
+        volumeMounts:
+        - name: config
+          mountPath: /etc/orthanc/orthanc.json
+          subPath: orthanc.json
+        - name: config
+          mountPath: /etc/orthanc/dicomweb-oauth.json
+          subPath: dicomweb-oauth.json
+        {{- if eq .Values.storage.type "pvc" }}
+        - name: data
+          mountPath: /var/lib/orthanc/db
+        {{- end }}
+
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "orthanc-oauth.fullname" . }}
+      {{- if eq .Values.storage.type "pvc" }}
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "orthanc-oauth.fullname" . }}
+      {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
