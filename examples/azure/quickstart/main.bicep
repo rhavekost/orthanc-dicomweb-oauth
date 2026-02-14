@@ -58,16 +58,10 @@ param tags object = {}
 
 var resourcePrefix = 'orthanc-${environmentName}'
 var postgresServerName = '${resourcePrefix}-db-${uniqueString(subscription().subscriptionId, resourceGroupName)}'
-var storageAccountName = replace('${resourcePrefix}sa${uniqueString(subscription().subscriptionId, resourceGroupName)}', '-', '')
+var storageAccountName = toLower(take(replace('${resourcePrefix}sa${uniqueString(subscription().subscriptionId, resourceGroupName)}', '-', ''), 24))
 var containerAppsEnvironmentName = '${resourcePrefix}-cae'
 var containerAppName = '${resourcePrefix}-app'
 var logAnalyticsName = '${resourcePrefix}-logs'
-
-// Reference to the deployed storage account for constructing connection string
-resource storageAccountRef 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
-  name: storageAccountName
-  scope: rg
-}
 
 // ========================================
 // Resource Group
@@ -121,6 +115,15 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.14.3' = {
       bypass: 'AzureServices'
     }
   }
+}
+
+// Reference to deployed storage account for getting keys (scoped to resource group)
+resource storageAccountResource 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: storageAccountName
+  scope: rg
+  dependsOn: [
+    storageAccount
+  ]
 }
 
 // ========================================
@@ -278,7 +281,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
         }
         {
           name: 'storage-connection-string'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountRef.name};AccountKey=${storageAccountRef.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountResource.name};AccountKey=${storageAccountResource.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
         }
         {
           name: 'oauth-client-secret'
