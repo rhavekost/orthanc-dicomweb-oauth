@@ -12,12 +12,14 @@
 // - orthancPassword: Provide via command line or leave empty to be prompted
 //
 // USAGE:
-//   az deployment group create \
-//     --resource-group rg-orthanc-production \
+//   az deployment sub create \
+//     --location eastus \
 //     --template-file main.bicep \
 //     --parameters main.bicepparam \
 //     --parameters postgresAdminPassword='<value>' orthancPassword='<value>'
 
+// NOTE: This parameter file requires main.bicep which will be created in Task 21.
+// The parameter file is created first to define the contract for the main template.
 using './main.bicep'
 
 // Environment configuration
