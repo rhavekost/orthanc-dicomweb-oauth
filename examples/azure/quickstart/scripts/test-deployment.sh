@@ -135,12 +135,32 @@ if [[ -z "$PASSWORD" ]]; then
 fi
 
 # ========================================
+# Setup Secure Credential Passing
+# ========================================
+
+# Create temporary .netrc file for secure credential passing
+# This prevents passwords from appearing in process lists or shell history
+NETRC_FILE=$(mktemp)
+trap "rm -f $NETRC_FILE" EXIT
+
+# Extract hostname from URL
+HOST=$(echo "$ORTHANC_URL" | sed 's|https\?://||' | cut -d/ -f1)
+
+# Create .netrc file with restricted permissions
+cat > "$NETRC_FILE" << EOF
+machine $HOST
+login $USERNAME
+password $PASSWORD
+EOF
+chmod 600 "$NETRC_FILE"
+
+# ========================================
 # Test 1: Check System Status
 # ========================================
 
 log_test "Test 1/5: Checking Orthanc system status"
 
-RESPONSE=$(curl -s -u "$USERNAME:$PASSWORD" "$ORTHANC_URL/system" || echo "")
+RESPONSE=$(curl -s --netrc-file "$NETRC_FILE" "$ORTHANC_URL/system" || echo "")
 
 if [[ -z "$RESPONSE" ]]; then
     log_error "Failed to connect to Orthanc at $ORTHANC_URL"
@@ -178,7 +198,7 @@ echo ""
 
 log_test "Test 3/5: Checking database connection"
 
-STATS=$(curl -s -u "$USERNAME:$PASSWORD" "$ORTHANC_URL/statistics" || echo "{}")
+STATS=$(curl -s --netrc-file "$NETRC_FILE" "$ORTHANC_URL/statistics" || echo "{}")
 TOTAL_STUDIES=$(echo "$STATS" | jq -r '.TotalDiskSize' || echo "unknown")
 
 log_info "Database connection: OK"
@@ -193,7 +213,7 @@ echo ""
 if [[ -n "$TEST_DICOM_FILE" && -f "$TEST_DICOM_FILE" ]]; then
     log_test "Test 4/5: Uploading test DICOM file"
 
-    UPLOAD_RESPONSE=$(curl -s -u "$USERNAME:$PASSWORD" \
+    UPLOAD_RESPONSE=$(curl -s --netrc-file "$NETRC_FILE" \
         -X POST \
         -H "Content-Type: application/dicom" \
         --data-binary "@$TEST_DICOM_FILE" \
@@ -220,7 +240,7 @@ echo ""
 
 log_test "Test 5/5: Checking Prometheus metrics"
 
-METRICS=$(curl -s -u "$USERNAME:$PASSWORD" "$ORTHANC_URL/metrics" || echo "")
+METRICS=$(curl -s --netrc-file "$NETRC_FILE" "$ORTHANC_URL/metrics" || echo "")
 
 if [[ -n "$METRICS" ]] && echo "$METRICS" | grep -q "orthanc_"; then
     log_info "Metrics endpoint responding"
