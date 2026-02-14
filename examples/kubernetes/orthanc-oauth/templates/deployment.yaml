@@ -33,7 +33,7 @@ spec:
       - name: orthanc
         securityContext:
           {{- toYaml .Values.securityContext | nindent 12 }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
         - name: http
@@ -50,20 +50,32 @@ spec:
         env:
         # Database configuration
         - name: ORTHANC__POSTGRESQL__HOST
+          {{- if eq .Values.database.type "external" }}
           value: "{{ .Values.database.external.host }}"
+          {{- else }}
+          value: "{{ include "orthanc-oauth.fullname" . }}-postgresql"
+          {{- end }}
         - name: ORTHANC__POSTGRESQL__PORT
-          value: "{{ .Values.database.external.port }}"
+          value: "{{ (eq .Values.database.type "external" | ternary .Values.database.external.port (.Values.database.inCluster.port | default 5432)) | toString }}"
         - name: ORTHANC__POSTGRESQL__DATABASE
-          value: "{{ .Values.database.external.database }}"
+          value: "{{ eq .Values.database.type "external" | ternary .Values.database.external.database (.Values.database.inCluster.database | default "orthanc") }}"
         - name: ORTHANC__POSTGRESQL__USERNAME
           valueFrom:
             secretKeyRef:
+              {{- if eq .Values.database.type "external" }}
               name: {{ .Values.database.external.credentialsSecret }}
+              {{- else }}
+              name: {{ include "orthanc-oauth.fullname" . }}-postgresql
+              {{- end }}
               key: username
         - name: ORTHANC__POSTGRESQL__PASSWORD
           valueFrom:
             secretKeyRef:
+              {{- if eq .Values.database.type "external" }}
               name: {{ .Values.database.external.credentialsSecret }}
+              {{- else }}
+              name: {{ include "orthanc-oauth.fullname" . }}-postgresql
+              {{- end }}
               key: password
 
         # Storage configuration
@@ -110,6 +122,8 @@ spec:
           mountPath: /var/lib/orthanc/db
         {{- end }}
 
+        # Health probes - Note: /system endpoint requires authentication if enabled
+        # Configure orthanc.registeredUsers or disable authenticationEnabled for probes to work
         livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 12 }}
         readinessProbe:
