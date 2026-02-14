@@ -26,28 +26,21 @@ data:
 
   # OAuth plugin configuration
   dicomweb-oauth.json: |
-    {
-      "DicomWebOAuth": {
-        "ConfigVersion": "2.0",
-        "LogLevel": "{{ .Values.oauthPlugin.logLevel }}",
-        "RateLimitRequests": {{ .Values.oauthPlugin.rateLimitRequests }},
-        "RateLimitWindowSeconds": {{ .Values.oauthPlugin.rateLimitWindowSeconds }},
-        "Servers": {
-          {{- range $name, $server := .Values.oauthPlugin.servers }}
-          "{{ $name }}": {
-            "Url": "{{ $server.url }}",
-            "TokenEndpoint": "{{ $server.tokenEndpoint }}",
-            "Scope": "{{ $server.scope }}",
-            "TokenRefreshBufferSeconds": {{ $server.tokenRefreshBufferSeconds | default 300 }},
-            {{- if eq $server.authentication.type "client-credentials" }}
-            "ClientId": "${OAUTH_CLIENT_ID}",
-            "ClientSecret": "${OAUTH_CLIENT_SECRET}",
-            {{- else if eq $server.authentication.type "workload-identity" }}
-            "UseManagedIdentity": true,
-            {{- end }}
-            "VerifySSL": true
-          }{{ if not (last $name $.Values.oauthPlugin.servers) }},{{ end }}
-          {{- end }}
-        }
-      }
-    }
+    {{- $servers := dict }}
+    {{- range $name, $server := .Values.oauthPlugin.servers }}
+    {{- $serverConfig := dict }}
+    {{- $_ := set $serverConfig "Url" $server.url }}
+    {{- $_ := set $serverConfig "TokenEndpoint" $server.tokenEndpoint }}
+    {{- $_ := set $serverConfig "Scope" $server.scope }}
+    {{- $_ := set $serverConfig "TokenRefreshBufferSeconds" (default 300 $server.tokenRefreshBufferSeconds) }}
+    {{- $_ := set $serverConfig "VerifySSL" true }}
+    {{- if eq $server.authentication.type "client-credentials" }}
+    {{- $_ := set $serverConfig "ClientId" "${OAUTH_CLIENT_ID}" }}
+    {{- $_ := set $serverConfig "ClientSecret" "${OAUTH_CLIENT_SECRET}" }}
+    {{- else if eq $server.authentication.type "workload-identity" }}
+    {{- $_ := set $serverConfig "UseManagedIdentity" true }}
+    {{- end }}
+    {{- $_ := set $servers $name $serverConfig }}
+    {{- end }}
+    {{- $config := dict "DicomWebOAuth" (dict "ConfigVersion" "2.0" "LogLevel" .Values.oauthPlugin.logLevel "RateLimitRequests" .Values.oauthPlugin.rateLimitRequests "RateLimitWindowSeconds" .Values.oauthPlugin.rateLimitWindowSeconds "Servers" $servers) }}
+    {{- $config | toJson }}
