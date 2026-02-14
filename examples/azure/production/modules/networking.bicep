@@ -106,6 +106,19 @@ resource containerAppsNsg 'Microsoft.Network/networkSecurityGroups@2023-11-01' =
           destinationAddressPrefix: 'Internet'
         }
       }
+      {
+        name: 'DenyAllOutbound'
+        properties: {
+          priority: 4096
+          direction: 'Outbound'
+          access: 'Deny'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '*'
+        }
+      }
     ]
   }
 }
@@ -154,6 +167,19 @@ resource privateEndpointsNsg 'Microsoft.Network/networkSecurityGroups@2023-11-01
           destinationPortRange: '*'
           sourceAddressPrefix: 'VirtualNetwork'
           destinationAddressPrefix: 'VirtualNetwork'
+        }
+      }
+      {
+        name: 'DenyAllOutbound'
+        properties: {
+          priority: 4096
+          direction: 'Outbound'
+          access: 'Deny'
+          protocol: '*'
+          sourcePortRange: '*'
+          destinationPortRange: '*'
+          sourceAddressPrefix: '*'
+          destinationAddressPrefix: '*'
         }
       }
     ]
