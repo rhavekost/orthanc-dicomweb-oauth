@@ -40,7 +40,7 @@ helm install orthanc orthanc-oauth/ -f values-azure.yaml
 
 ## Configuration
 
-See [values.yaml](values.yaml) for all configuration options.
+See `values.yaml` (created in next task) for all configuration options.
 
 ### Key Configuration Sections
 
