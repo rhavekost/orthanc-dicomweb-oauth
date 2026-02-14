@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "15343998733849543585"
+    }
+  },
+  "parameters": {
+    "dicomServiceUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "DICOM service URL"
+      }
+    },
+    "tokenEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "OAuth token endpoint"
+      }
+    },
+    "scope": {
+      "type": "string",
+      "metadata": {
+        "description": "OAuth scope"
+      }
+    },
+    "dicomAet": {
+      "type": "string",
+      "defaultValue": "ORTHANC",
+      "metadata": {
+        "description": "Orthanc DICOM AET"
+      }
+    },
+    "httpPort": {
+      "type": "int",
+      "defaultValue": 8042,
+      "metadata": {
+        "description": "Orthanc HTTP port"
+      }
+    },
+    "dicomPort": {
+      "type": "int",
+      "defaultValue": 4242,
+      "metadata": {
+        "description": "Orthanc DICOM port"
+      }
+    }
+  },
+  "resources": [],
+  "outputs": {
+    "orthancConfig": {
+      "type": "object",
+      "value": {
+        "Name": "[parameters('dicomAet')]",
+        "RemoteAccessAllowed": true,
+        "AuthenticationEnabled": true,
+        "HttpPort": "[parameters('httpPort')]",
+        "HttpCompressionEnabled": true,
+        "HttpThreadsCount": 50,
+        "DicomAet": "[parameters('dicomAet')]",
+        "DicomPort": "[parameters('dicomPort')]",
+        "DicomThreadsCount": 4,
+        "Plugins": [
+          "/etc/orthanc/plugins/dicomweb_oauth_plugin.py"
+        ]
+      }
+    },
+    "oauthPluginConfig": {
+      "type": "object",
+      "value": {
+        "DicomWebOAuth": {
+          "ConfigVersion": "2.0",
+          "LogLevel": "INFO",
+          "RateLimitRequests": 100,
+          "RateLimitWindowSeconds": 60,
+          "Servers": {
+            "azure-dicom": {
+              "Url": "[parameters('dicomServiceUrl')]",
+              "TokenEndpoint": "[parameters('tokenEndpoint')]",
+              "Scope": "[parameters('scope')]",
+              "TokenRefreshBufferSeconds": 300,
+              "ClientId": "OAUTH_CLIENT_ID",
+              "ClientSecret": "OAUTH_CLIENT_SECRET",
+              "VerifySSL": true
+            }
+          }
+        }
+      }
+    }
+  }
+}
