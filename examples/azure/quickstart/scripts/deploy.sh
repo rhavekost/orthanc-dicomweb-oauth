@@ -238,9 +238,27 @@ log_step "Step 4/6: Generating deployment parameters"
 # Read DICOM service URL from parameters file
 DICOM_SERVICE_URL=$(jq -r '.parameters.dicomServiceUrl.value' "$PARAMETERS_FILE")
 
-# Generate secure passwords if not in parameters
-POSTGRES_PASSWORD=$(openssl rand -base64 32)
-ORTHANC_PASSWORD=$(openssl rand -base64 24)
+# Reuse existing passwords if deployment-details.json exists (idempotency)
+if [[ -f "deployment-details.json" ]]; then
+    log_info "Found existing deployment - reusing credentials"
+    POSTGRES_PASSWORD=$(jq -r '.postgresPassword // empty' deployment-details.json)
+    ORTHANC_PASSWORD=$(jq -r '.orthancPassword' deployment-details.json)
+fi
+
+# Generate secure passwords only if not found
+if [[ -z "$POSTGRES_PASSWORD" ]]; then
+    log_info "Generating new PostgreSQL password"
+    POSTGRES_PASSWORD=$(openssl rand -base64 32)
+else
+    log_info "Reusing existing PostgreSQL password"
+fi
+
+if [[ -z "$ORTHANC_PASSWORD" ]]; then
+    log_info "Generating new Orthanc password"
+    ORTHANC_PASSWORD=$(openssl rand -base64 24)
+else
+    log_info "Reusing existing Orthanc password"
+fi
 
 # Create deployment parameters
 cat > deployment-params.json << EOF
@@ -326,6 +344,7 @@ cat > deployment-details.json << EOF
   "storageAccount": "$STORAGE_ACCOUNT",
   "orthancUsername": "admin",
   "orthancPassword": "$ORTHANC_PASSWORD",
+  "postgresPassword": "$POSTGRES_PASSWORD",
   "deploymentName": "$DEPLOYMENT_NAME",
   "deploymentTimestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
