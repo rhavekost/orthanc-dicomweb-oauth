@@ -1,0 +1,123 @@
+# Azure-specific configuration overrides
+# Use with: helm install orthanc . -f values-azure.yaml
+
+# These values assume you have Azure resources already deployed:
+# - Azure Health Data Services DICOM service
+# - Azure Database for PostgreSQL Flexible Server
+# - Azure Blob Storage account
+# - Azure Key Vault (optional, for secrets)
+# - User-Assigned Managed Identity with workload identity enabled
+
+# Database configuration for Azure PostgreSQL
+database:
+  external:
+    # Replace with your PostgreSQL server FQDN
+    host: "REPLACE_WITH_POSTGRES_FQDN"  # e.g., myserver.postgres.database.azure.com
+    port: 5432
+    database: orthanc
+    sslMode: require
+    # Kubernetes secret should contain 'username' and 'password' keys
+    # Create with: kubectl create secret generic azure-postgresql-creds \
+    #   --from-literal=username=orthanc_admin \
+    #   --from-literal=password=YOUR_PASSWORD
+    credentialsSecret: azure-postgresql-creds
+
+# Storage configuration for Azure Blob Storage
+storage:
+  external:
+    provider: azure-blob
+    # Kubernetes secret should contain 'connectionString' key
+    # Create with: kubectl create secret generic azure-storage-creds \
+    #   --from-literal=connectionString="DefaultEndpointsProtocol=https;AccountName=..."
+    connectionStringSecret: azure-storage-creds
+    container: orthanc-dicom
+
+# OAuth plugin configuration for Azure DICOM service
+oauthPlugin:
+  logLevel: INFO
+  rateLimitRequests: 100
+  rateLimitWindowSeconds: 60
+
+  servers:
+    azure-dicom:
+      # Replace with your DICOM service URL
+      url: "REPLACE_WITH_DICOM_SERVICE_URL"  # e.g., https://workspace-dicom.dicom.azurehealthcareapis.com/v2/
+      # Replace TENANT_ID with your Azure AD tenant ID
+      tokenEndpoint: "https://login.microsoftonline.com/REPLACE_WITH_TENANT_ID/oauth2/v2.0/token"
+      scope: "https://dicom.healthcareapis.azure.com/.default"
+      tokenRefreshBufferSeconds: 300
+
+      authentication:
+        # Use Azure Workload Identity (recommended for AKS)
+        type: workload-identity
+        # Replace with your User-Assigned Managed Identity client ID
+        clientId: "REPLACE_WITH_MANAGED_IDENTITY_CLIENT_ID"
+
+# Service account with workload identity annotations
+serviceAccount:
+  create: true
+  annotations:
+    # Replace these with your actual values
+    azure.workload.identity/client-id: "REPLACE_WITH_MANAGED_IDENTITY_CLIENT_ID"
+    azure.workload.identity/tenant-id: "REPLACE_WITH_TENANT_ID"
+
+# Pod annotations for workload identity
+podAnnotations:
+  azure.workload.identity/use: "true"
+
+# Ingress configuration (example for Azure Application Gateway)
+ingress:
+  enabled: true
+  className: azure-application-gateway
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    appgw.ingress.kubernetes.io/backend-protocol: http
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: orthanc.example.com  # Replace with your domain
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: orthanc-tls
+      hosts:
+        - orthanc.example.com
+
+# Monitoring (Azure Monitor integration)
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    port: 9090
+  serviceMonitor:
+    enabled: true  # If using Prometheus Operator
+    interval: 30s
+
+# Resource configuration (adjust based on workload)
+resources:
+  requests:
+    cpu: 2000m
+    memory: 4Gi
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Node affinity (optional - prefer specific node pools)
+# affinity:
+#   nodeAffinity:
+#     preferredDuringSchedulingIgnoredDuringExecution:
+#     - weight: 100
+#       preference:
+#         matchExpressions:
+#         - key: workload
+#           operator: In
+#           values:
+#           - medical-imaging
