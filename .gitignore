@@ -32,3 +32,6 @@ secrets/
 
 # Docker
 *.log
+# Azure Bicep build artifacts
+examples/azure/quickstart/*.json
+examples/azure/quickstart/modules/*.json
