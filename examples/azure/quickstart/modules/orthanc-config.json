@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.38.33.27573",
-      "templateHash": "15343998733849543585"
+      "templateHash": "12602814127643906755"
     }
   },
   "parameters": {
@@ -25,6 +25,18 @@
       "type": "string",
       "metadata": {
         "description": "OAuth scope"
+      }
+    },
+    "clientId": {
+      "type": "string",
+      "metadata": {
+        "description": "OAuth client ID"
+      }
+    },
+    "clientSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "OAuth client secret"
       }
     },
     "dicomAet": {
@@ -82,8 +94,8 @@
               "TokenEndpoint": "[parameters('tokenEndpoint')]",
               "Scope": "[parameters('scope')]",
               "TokenRefreshBufferSeconds": 300,
-              "ClientId": "OAUTH_CLIENT_ID",
-              "ClientSecret": "OAUTH_CLIENT_SECRET",
+              "ClientId": "[parameters('clientId')]",
+              "ClientSecret": "[parameters('clientSecret')]",
               "VerifySSL": true
             }
           }

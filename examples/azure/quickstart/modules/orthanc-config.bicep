@@ -11,6 +11,13 @@ param tokenEndpoint string
 @description('OAuth scope')
 param scope string
 
+@description('OAuth client ID')
+param clientId string
+
+@description('OAuth client secret')
+@secure()
+param clientSecret string
+
 @description('Orthanc DICOM AET')
 param dicomAet string = 'ORTHANC'
 
@@ -51,8 +58,8 @@ output oauthPluginConfig object = {
         TokenEndpoint: tokenEndpoint
         Scope: scope
         TokenRefreshBufferSeconds: 300
-        ClientId: 'OAUTH_CLIENT_ID'
-        ClientSecret: 'OAUTH_CLIENT_SECRET'
+        ClientId: clientId
+        ClientSecret: clientSecret
         VerifySSL: true
       }
     }
