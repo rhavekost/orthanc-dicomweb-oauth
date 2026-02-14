@@ -246,6 +246,10 @@ log_step "Step 4/7: Generating deployment parameters"
 # Read DICOM service URL from parameters file
 DICOM_SERVICE_URL=$(jq -r '.parameters.dicomServiceUrl.value' "$PARAMETERS_FILE")
 
+# Initialize password variables
+POSTGRES_PASSWORD=""
+ORTHANC_PASSWORD=""
+
 # Reuse existing passwords if deployment-details.json exists (idempotency)
 if [[ -f "deployment-details.json" ]]; then
     log_info "Found existing deployment - reusing credentials"

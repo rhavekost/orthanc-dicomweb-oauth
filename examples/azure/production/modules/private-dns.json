@@ -1,0 +1,98 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "12041918349947318763"
+    }
+  },
+  "parameters": {
+    "vnetId": {
+      "type": "string",
+      "metadata": {
+        "description": "Virtual Network ID to link DNS zones to"
+      }
+    },
+    "vnetName": {
+      "type": "string",
+      "metadata": {
+        "description": "Virtual Network name for link naming"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Resource tags"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "privatelink.postgres.database.azure.com",
+      "location": "global",
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "[format('privatelink.blob.{0}', environment().suffixes.storage)]",
+      "location": "global",
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', 'privatelink.postgres.database.azure.com', format('{0}-postgres-link', parameters('vnetName')))]",
+      "location": "global",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[parameters('vnetId')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.postgres.database.azure.com')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', format('privatelink.blob.{0}', environment().suffixes.storage), format('{0}-blob-link', parameters('vnetName')))]",
+      "location": "global",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[parameters('vnetId')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', format('privatelink.blob.{0}', environment().suffixes.storage))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "postgresDnsZoneId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.postgres.database.azure.com')]"
+    },
+    "blobDnsZoneId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/privateDnsZones', format('privatelink.blob.{0}', environment().suffixes.storage))]"
+    },
+    "postgresDnsZoneName": {
+      "type": "string",
+      "value": "privatelink.postgres.database.azure.com"
+    },
+    "blobDnsZoneName": {
+      "type": "string",
+      "value": "[format('privatelink.blob.{0}', environment().suffixes.storage)]"
+    }
+  }
+}

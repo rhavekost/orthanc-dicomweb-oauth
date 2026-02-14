@@ -4,7 +4,7 @@ FROM orthancteam/orthanc:24.12.0-full
 # Versions match requirements.txt
 RUN apt-get update && \
     apt-get install -y python3-pip curl && \
-    pip3 install --no-cache-dir \
+    pip3 install --break-system-packages --no-cache-dir \
         requests==2.31.0 \
         PyJWT==2.11.0 \
         cryptography==42.0.0 \

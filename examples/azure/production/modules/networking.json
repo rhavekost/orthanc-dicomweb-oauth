@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.38.33.27573",
-      "templateHash": "3588132510305708272"
+      "templateHash": "8852396089301576780"
     }
   },
   "parameters": {
@@ -104,6 +104,45 @@
               "sourceAddressPrefix": "*",
               "destinationAddressPrefix": "*"
             }
+          },
+          {
+            "name": "AllowAzureCloudOutbound",
+            "properties": {
+              "priority": 200,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "AzureCloud"
+            }
+          },
+          {
+            "name": "AllowInternetOutbound",
+            "properties": {
+              "priority": 210,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "443",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "Internet"
+            }
+          },
+          {
+            "name": "DenyAllOutbound",
+            "properties": {
+              "priority": 4096,
+              "direction": "Outbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
           }
         ]
       }
@@ -134,6 +173,32 @@
             "properties": {
               "priority": 4096,
               "direction": "Inbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          },
+          {
+            "name": "AllowVnetOutbound",
+            "properties": {
+              "priority": 200,
+              "direction": "Outbound",
+              "access": "Allow",
+              "protocol": "*",
+              "sourcePortRange": "*",
+              "destinationPortRange": "*",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "destinationAddressPrefix": "VirtualNetwork"
+            }
+          },
+          {
+            "name": "DenyAllOutbound",
+            "properties": {
+              "priority": 4096,
+              "direction": "Outbound",
               "access": "Deny",
               "protocol": "*",
               "sourcePortRange": "*",
