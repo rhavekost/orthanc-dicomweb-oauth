@@ -17,6 +17,22 @@ Deploy Orthanc with OAuth plugin to Azure Container Apps with client credentials
 - Docker (for building custom image)
 - Contributor + User Access Administrator role
 
+## Building the Docker Image
+
+**IMPORTANT:** When building for Azure Container Apps (or any cloud service), you MUST specify the target platform:
+
+```bash
+# Build for linux/amd64 (required for Azure Container Apps)
+docker buildx build --platform linux/amd64 -t <registry>/<image>:<tag> -f examples/azure/quickstart/Dockerfile .
+
+# Note: Build context is repository root (.), not examples/azure/quickstart/
+```
+
+**Why this matters:**
+- M1/M2/M3 Macs build arm64 images by default
+- Azure Container Apps runs on amd64 Linux
+- An arm64 image will fail with "ImagePullFailure: not found"
+
 ## Documentation
 
 Full documentation coming soon.

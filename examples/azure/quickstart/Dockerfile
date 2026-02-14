@@ -1,22 +1,27 @@
-FROM orthancteam/orthanc:24.12.1-full
+FROM orthancteam/orthanc:24.12.0-full
 
 # Install Python dependencies for OAuth plugin
+# Versions match requirements.txt
 RUN apt-get update && \
-    apt-get install -y python3-pip && \
+    apt-get install -y python3-pip curl && \
     pip3 install --no-cache-dir \
         requests==2.31.0 \
-        PyJWT==2.8.0 \
-        cryptography==41.0.7 \
-        redis==5.0.1 \
-        prometheus-client==0.19.0 && \
+        PyJWT==2.11.0 \
+        cryptography==42.0.0 \
+        redis==5.3.1 \
+        prometheus-client==0.19.0 \
+        jsonschema==4.20.0 \
+        flask-limiter==3.5.0 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy OAuth plugin from repository root
-# Build context should be repository root
-COPY src/ /etc/orthanc/plugins/
+# Build context MUST be repository root
+COPY src/ /etc/orthanc/plugins/src/
+COPY schemas/ /etc/orthanc/plugins/schemas/
 
-# Plugin will be loaded via ORTHANC__PLUGINS environment variable
-ENV ORTHANC__PLUGINS='["/etc/orthanc/plugins/dicomweb_oauth_plugin.py"]'
+# Set PYTHONPATH for plugin imports
+ENV PYTHONPATH="/etc/orthanc/plugins:${PYTHONPATH}"
+ENV ORTHANC__PLUGINS='["/etc/orthanc/plugins/src/dicomweb_oauth_plugin.py"]'
 
 # Expose Orthanc HTTP and DICOM ports
 EXPOSE 8042 4242
