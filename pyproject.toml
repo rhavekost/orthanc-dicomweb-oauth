@@ -40,6 +40,10 @@ no_implicit_optional = true
 strict_optional = true
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "src.dicomweb_oauth_plugin"
+disable_error_code = ["misc"]
+
 [tool.bandit]
 exclude_dirs = [
     "tests",

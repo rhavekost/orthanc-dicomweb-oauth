@@ -1,37 +1,56 @@
-FROM orthancteam/orthanc:24.12.0-full
+# Use orthancteam image with latest SDK and all plugins
+FROM orthancteam/orthanc:latest-full
 
-# Install Python dependencies for OAuth plugin
-# Versions match requirements.txt
-RUN apt-get update && \
-    apt-get install -y python3-pip curl && \
-    pip3 install --break-system-packages --no-cache-dir \
-        requests==2.31.0 \
-        PyJWT==2.11.0 \
-        cryptography==42.0.0 \
-        redis==5.3.1 \
-        prometheus-client==0.19.0 \
-        jsonschema==4.20.0 \
-        flask-limiter==3.5.0 && \
-    rm -rf /var/lib/apt/lists/*
+# Install Python dependencies and gettext-base for envsubst
+# Note: orthancteam image already has Python and many dependencies
+RUN apt-get update && apt-get install -y \
+    python3-requests \
+    python3-jwt \
+    python3-cryptography \
+    python3-jsonschema \
+    python3-prometheus-client \
+    python3-flask-limiter \
+    python3-redis \
+    gettext-base \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy OAuth plugin from repository root
-# Build context MUST be repository root
+# Copy entire src directory to maintain package structure
 COPY src/ /etc/orthanc/plugins/src/
+
+# Copy schemas directory for config validation
 COPY schemas/ /etc/orthanc/plugins/schemas/
 
-# Copy Orthanc configuration (enables remote access)
-COPY examples/azure/quickstart/orthanc.json /etc/orthanc/orthanc.json
+# Set Python path to include plugin directory
+ENV PYTHONPATH=/etc/orthanc/plugins
 
-# Set PYTHONPATH for plugin imports
-ENV PYTHONPATH="/etc/orthanc/plugins:${PYTHONPATH}"
-ENV ORTHANC__PLUGINS='["/etc/orthanc/plugins/src/dicomweb_oauth_plugin.py"]'
+# Copy Orthanc configuration as template (will be processed at runtime)
+COPY examples/azure/quickstart/orthanc.json /etc/orthanc/orthanc.json.template
 
-# Expose Orthanc HTTP and DICOM ports
+# Copy and make entrypoint script executable
+COPY examples/azure/quickstart/docker-entrypoint.sh /usr/local/bin/custom-entrypoint.sh
+RUN chmod +x /usr/local/bin/custom-entrypoint.sh
+
+# Enable required plugins via symlinks (orthancteam pattern)
+# CRITICAL: Load Python plugin FIRST (renamed to 00-python.so) to intercept routes before DICOMweb plugin
+# Only link plugins that actually exist to avoid startup crashes
+RUN mkdir -p /etc/orthanc/plugins && \
+    cd /usr/share/orthanc/plugins-available && \
+    for plugin in libOrthancPython.so libOrthancDicomWeb.so libOrthancExplorer2.so libOrthancGdcm.so; do \
+        if [ -f "$plugin" ]; then \
+            if [ "$plugin" = "libOrthancPython.so" ]; then \
+                ln -s /usr/share/orthanc/plugins-available/$plugin /etc/orthanc/plugins/00-$plugin; \
+            else \
+                ln -s /usr/share/orthanc/plugins-available/$plugin /etc/orthanc/plugins/; \
+            fi; \
+        fi; \
+    done
+
+# Expose ports
 EXPOSE 8042 4242
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8042/system || exit 1
 
-# The base image handles user switching via entrypoint
-CMD ["/etc/orthanc/"]
+ENTRYPOINT ["/usr/local/bin/custom-entrypoint.sh"]

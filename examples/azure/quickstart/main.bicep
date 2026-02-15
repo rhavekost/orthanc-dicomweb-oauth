@@ -23,14 +23,8 @@ param containerRegistryName string
 @secure()
 param containerRegistryPassword string
 
-@description('The URL of the DICOM service')
-param dicomServiceUrl string
-
 @description('The Azure AD tenant ID')
 param tenantId string
-
-@description('The OAuth scope for the DICOM service')
-param dicomScope string
 
 @description('The OAuth client ID for client credentials flow')
 param oauthClientId string
@@ -38,6 +32,9 @@ param oauthClientId string
 @description('The OAuth client secret')
 @secure()
 param oauthClientSecret string
+
+@description('The service principal object ID for the OAuth app registration (needed for RBAC)')
+param servicePrincipalObjectId string
 
 @description('PostgreSQL administrator username')
 param postgresAdminUsername string
@@ -66,6 +63,10 @@ var storageAccountName = toLower(take(replace('${resourcePrefix}sa${uniqueString
 var containerAppsEnvironmentName = '${resourcePrefix}-cae'
 var containerAppName = '${resourcePrefix}-app'
 var logAnalyticsName = '${resourcePrefix}-logs'
+// Healthcare workspace name: 3-24 chars, alphanumeric only (no hyphens)
+// Format: orthws + 13-char hash = 19 chars (within 3-24 limit)
+var healthcareWorkspaceName = toLower('orthws${uniqueString(subscription().subscriptionId, resourceGroupName)}')
+var dicomServiceName = '${resourcePrefix}-dicom'
 
 // ========================================
 // Resource Group
@@ -75,6 +76,39 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
   tags: tags
+}
+
+// ========================================
+// Healthcare Workspace with DICOM Service
+// ========================================
+
+module healthcareWorkspace './modules/healthcare-workspace.bicep' = {
+  scope: rg
+  name: 'healthcareWorkspaceDeployment'
+  params: {
+    workspaceName: healthcareWorkspaceName
+    dicomServiceName: dicomServiceName
+    location: location
+    tags: tags
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// ========================================
+// RBAC: Grant DICOM Data Owner to Service Principal
+// ========================================
+
+module dicomRbac './modules/dicom-rbac.bicep' = {
+  scope: rg
+  name: 'dicomRbacDeployment'
+  params: {
+    workspaceName: healthcareWorkspaceName
+    dicomServiceName: dicomServiceName
+    servicePrincipalObjectId: servicePrincipalObjectId
+  }
+  dependsOn: [
+    healthcareWorkspace
+  ]
 }
 
 // ========================================
@@ -242,11 +276,11 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
           }
           {
             name: 'DICOM_SERVICE_URL'
-            value: dicomServiceUrl
+            value: healthcareWorkspace.outputs.dicomServiceUrl
           }
           {
             name: 'DICOM_SCOPE'
-            value: dicomScope
+            value: 'https://dicom.healthcareapis.azure.com/.default'
           }
           {
             name: 'ORTHANC_USERNAME'
@@ -255,6 +289,18 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
           {
             name: 'ORTHANC_PASSWORD'
             secretRef: 'orthanc-password'
+          }
+          {
+            name: 'ORTHANC__PYTHON_SCRIPT'
+            value: '/etc/orthanc/plugins/src/dicomweb_oauth_plugin.py'
+          }
+          {
+            name: 'ORTHANC__DICOM_WEB__ENABLE'
+            value: 'true'
+          }
+          {
+            name: 'ORTHANC__ORTHANC_EXPLORER2__ENABLE'
+            value: 'true'
           }
         ]
         // Health probes removed - Orthanc requires authentication which Container Apps probes don't support
@@ -332,3 +378,15 @@ output containerAppUrl string = containerApp.outputs.fqdn
 output postgresServerFqdn string = postgres.outputs.fqdn
 output storageAccountName string = storageAccount.outputs.name
 output containerAppIdentityPrincipalId string = containerApp.outputs.systemAssignedMIPrincipalId
+
+// Healthcare workspace outputs
+output healthcareWorkspaceId string = healthcareWorkspace.outputs.workspaceId
+output healthcareWorkspaceName string = healthcareWorkspace.outputs.workspaceName
+output dicomServiceUrl string = healthcareWorkspace.outputs.dicomServiceUrl
+output dicomServiceId string = healthcareWorkspace.outputs.dicomServiceId
+output dicomScope string = 'https://dicom.healthcareapis.azure.com/.default'
+output dicomAuthority string = healthcareWorkspace.outputs.dicomAuthority
+output tokenEndpoint string = '${environment().authentication.loginEndpoint}${tenantId}/oauth2/v2.0/token'
+
+// RBAC assignment
+output dicomRoleAssignmentId string = dicomRbac.outputs.roleAssignmentId

@@ -58,12 +58,6 @@ resource dicomService 'Microsoft.HealthcareApis/workspaces/dicomservices@2023-11
   location: location
   tags: tags
   properties: {
-    authenticationConfiguration: {
-      authority: 'https://login.microsoftonline.com/${tenant().tenantId}'
-      audiences: [
-        'https://dicom.healthcareapis.azure.com/'
-      ]
-    }
     publicNetworkAccess: publicNetworkAccess
     corsConfiguration: {
       origins: [

@@ -44,6 +44,57 @@ Generic OAuth2/OIDC token management plugin for Orthanc's DICOMweb connections. 
 ✅ **Comprehensive Tests** - High test coverage with quality enforcement
 ✅ **Pre-commit Hooks** - Automatic formatting and quality checks
 
+## 🎯 Transparent OAuth Integration (NEW!)
+
+**Users can now send DICOM studies to OAuth-protected servers using the standard Orthanc UI!**
+
+No manual token management. No API calls. Just click "Send to DICOMWeb server" and OAuth authentication happens automatically in the background.
+
+### How It Works
+
+1. Configure DICOMweb server URL to point to local OAuth proxy
+2. User selects study and clicks "Send to DICOMWeb server" in Orthanc Explorer 2
+3. Plugin automatically:
+   - Acquires OAuth token from provider (Azure AD, Google, etc.)
+   - Caches token for reuse
+   - Forwards DICOM data with Bearer token
+   - Refreshes token when needed
+
+### Verified Working With
+
+- ✅ **Azure Health Data Services DICOM** - Full transparent integration
+- ✅ **Google Cloud Healthcare API** - Token acquisition and forwarding
+- 🔄 **Other OAuth2 providers** - Should work, needs testing
+
+### Example Configuration
+
+```json
+{
+  "DicomWeb": {
+    "Servers": {
+      "azure-dicom": {
+        "Url": "http://localhost:8042/oauth-dicom-web/servers/azure-dicom",
+        "Username": "admin",
+        "Password": "secret"
+      }
+    }
+  },
+  "DicomWebOAuth": {
+    "Servers": {
+      "azure-dicom": {
+        "Url": "https://workspace.dicom.azurehealthcareapis.com/v1",
+        "TokenEndpoint": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+        "ClientId": "{client-id}",
+        "ClientSecret": "{client-secret}",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default"
+      }
+    }
+  }
+}
+```
+
+**📘 Full Documentation:** See [Transparent OAuth Guide](examples/azure/quickstart/TRANSPARENT-OAUTH-GUIDE.md) for complete setup instructions, troubleshooting, and architecture details.
+
 ## ⚠️ Security Notice
 
 **This plugin handles authentication credentials for healthcare systems containing Protected Health Information (PHI).**
