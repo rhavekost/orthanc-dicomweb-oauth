@@ -788,9 +788,6 @@ class TestCreateFlaskApp:
 
     def test_create_flask_app_without_flask(self) -> None:
         """Test Flask app creation error when Flask not available."""
-        # This test verifies the ImportError path is reachable
-        # In reality, Flask is available in the test environment
-        # so we'll just verify the function signature is correct
         servers_config = {
             "test-server": {
                 "Url": "https://dicom.example.com",
@@ -801,9 +798,10 @@ class TestCreateFlaskApp:
             }
         }
 
-        # Verify function accepts parameters correctly
-        app = create_flask_app(servers_config)
-        assert app is not None
+        # Mock Flask as unavailable
+        with patch("src.dicomweb_oauth_plugin._FLASK_AVAILABLE", False):
+            with pytest.raises(ImportError, match="Flask is required"):
+                create_flask_app(servers_config)
 
 
 # Additional edge case tests
@@ -819,21 +817,29 @@ class TestEdgeCases:
             "body": b"DICOM_DATA",
         }
 
-        # Patch to return token but fail on URL
+        # Mock token acquisition to succeed, but context to have no URL
         with patch(
             "src.dicomweb_oauth_plugin._get_oauth_token", return_value="test_token"
         ):
-            with patch("src.dicomweb_oauth_plugin._get_stow_url", return_value=None):
-                _process_stow_request(
-                    mock_output,
-                    "/oauth-dicom-web/servers/test-server/studies",
-                    request,
-                    mock_orthanc,
-                )
+            # Simulate edge case: server has token manager but no URL registered
+            context = PluginContext.get_instance()
+            context.server_urls.pop(
+                "test-server", None
+            )  # Remove URL but keep token manager
 
-        # Should have called AnswerBuffer from _get_stow_url
-        # The function returns early, so this is the expected behavior
-        assert True  # Test passes if no exception raised
+            _process_stow_request(
+                mock_output,
+                "/oauth-dicom-web/servers/test-server/studies",
+                request,
+                mock_orthanc,
+            )
+
+        # Verify error response was sent when STOW URL lookup failed
+        mock_output.AnswerBuffer.assert_called_once()
+        call_args = mock_output.AnswerBuffer.call_args[0]
+        error_data = json.loads(call_args[0])
+        assert "error" in error_data
+        assert "Server URL not found" in error_data["error"]
 
     @responses.activate  # type: ignore[misc]
     def test_send_dicom_binary_response(self, mock_output: Mock) -> None:
