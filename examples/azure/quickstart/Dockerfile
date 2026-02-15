@@ -33,10 +33,12 @@ RUN chmod +x /usr/local/bin/custom-entrypoint.sh
 
 # Enable required plugins via symlinks (orthancteam pattern)
 # CRITICAL: Load Python plugin FIRST (renamed to 00-python.so) to intercept routes before DICOMweb plugin
+# PostgreSQL Index plugin for persistent metadata
+# Azure Blob Storage plugin for persistent DICOM file storage
 # Only link plugins that actually exist to avoid startup crashes
 RUN mkdir -p /etc/orthanc/plugins && \
     cd /usr/share/orthanc/plugins-available && \
-    for plugin in libOrthancPython.so libOrthancDicomWeb.so libOrthancExplorer2.so libOrthancGdcm.so; do \
+    for plugin in libOrthancPython.so libOrthancPostgreSQLIndex.so libOrthancAzureBlobStorage.so libOrthancDicomWeb.so libOrthancExplorer2.so libOrthancGdcm.so; do \
         if [ -f "$plugin" ]; then \
             if [ "$plugin" = "libOrthancPython.so" ]; then \
                 ln -s /usr/share/orthanc/plugins-available/$plugin /etc/orthanc/plugins/00-$plugin; \

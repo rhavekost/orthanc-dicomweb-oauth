@@ -1,8 +1,8 @@
 # Transparent OAuth Integration Guide
 
-## 🎯 Achievement: Transparent OAuth for Orthanc → Azure DICOM
+## 🎯 Transparent OAuth for Orthanc → Azure DICOM
 
-This guide documents the **working transparent OAuth integration** that allows users to send DICOM studies from Orthanc to Azure Health Data Services DICOM using the standard "Send to DICOMWeb server" UI button, with OAuth authentication handled completely transparently in the background.
+This guide documents the transparent OAuth integration that enables users to send DICOM studies from Orthanc to Azure Health Data Services DICOM using the standard "Send to DICOMWeb server" UI button, with OAuth authentication handled completely transparently in the background.
 
 ## ✅ What Works
 
@@ -330,11 +330,10 @@ When transparent OAuth is working, you'll see:
 - [Orthanc Book](https://orthanc.uclouvain.be/book/)
 - [Orthanc Plugin SDK](https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Plugins/Include/orthanc/OrthancCPlugin.h)
 
-## 🎉 Conclusion
+## 🎉 Summary
 
-**Transparent OAuth integration is WORKING!**
+The transparent OAuth integration enables seamless DICOM workflows:
 
-Users can now:
 - Use standard Orthanc UI
 - Select Azure DICOM from dropdown
 - Click "Send to DICOMWeb server"

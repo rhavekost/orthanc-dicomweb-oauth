@@ -89,8 +89,8 @@ output workspaceId string = workspace.id
 @description('Name of the healthcare workspace')
 output workspaceName string = workspace.name
 
-@description('DICOM service endpoint URL')
-output dicomServiceUrl string = dicomService.properties.serviceUrl
+@description('DICOM service endpoint URL (with /v2 API version - latest stable)')
+output dicomServiceUrl string = '${dicomService.properties.serviceUrl}/v2'
 
 @description('Resource ID of the DICOM service')
 output dicomServiceId string = dicomService.id

@@ -2,7 +2,7 @@
 
 Deploy Orthanc with OAuth plugin to Azure Container Apps using client credentials authentication.
 
-> 📘 **NEW: Transparent OAuth Integration** - Users can send DICOM studies to Azure using the standard Orthanc UI "Send to DICOMWeb server" button. OAuth authentication happens automatically in the background. See [TRANSPARENT-OAUTH-GUIDE.md](TRANSPARENT-OAUTH-GUIDE.md) for details.
+> 📘 **Transparent OAuth Integration** - Users send DICOM studies to Azure using the standard Orthanc UI "Send to DICOMWeb server" button. OAuth authentication happens automatically in the background. See [TRANSPARENT-OAUTH-GUIDE.md](TRANSPARENT-OAUTH-GUIDE.md) for details.
 
 ## Overview
 
@@ -57,6 +57,22 @@ This quickstart deploys Orthanc to Azure Container Apps with:
 │  └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## 🔧 Critical Configuration Notes
+
+### Docker Architecture for Azure
+**IMPORTANT for Mac M1/M2/M3 users:**
+- All Docker images are built with `--platform linux/amd64` for Azure compatibility
+- Deployment scripts automatically handle this
+- Without this flag, images fail to start on Azure Container Apps
+
+### PostgreSQL Configuration
+The deployment automatically configures:
+- **Extensions**: `pg_trgm`, `uuid-ossp` (required by Orthanc)
+- **SSL**: Disabled for simplified connectivity (`require_secure_transport: off`)
+- **Orthanc Settings**: Port hardcoded as `5432`, `EnableSSL: false`
+
+These settings are critical for Orthanc PostgreSQL plugin compatibility.
 
 ## Prerequisites
 

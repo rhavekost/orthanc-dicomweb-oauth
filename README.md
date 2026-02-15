@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/rhavekost/orthanc-dicomweb-oauth/branch/main/graph/badge.svg)](https://codecov.io/gh/rhavekost/orthanc-dicomweb-oauth)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Generic OAuth2/OIDC token management plugin for Orthanc's DICOMweb connections. Automatically acquires, caches, and refreshes bearer tokens for any OAuth2-protected DICOMweb endpoint.
+Enables Orthanc to transparently connect to OAuth2-protected DICOMweb servers through the standard UI. Automatically handles token acquisition, caching, and refresh for any OAuth2/OIDC provider—users simply click "Send to DICOMWeb server" as usual.
 
 ## Features
 
@@ -44,11 +44,11 @@ Generic OAuth2/OIDC token management plugin for Orthanc's DICOMweb connections. 
 ✅ **Comprehensive Tests** - High test coverage with quality enforcement
 ✅ **Pre-commit Hooks** - Automatic formatting and quality checks
 
-## 🎯 Transparent OAuth Integration (NEW!)
+## 🎯 Transparent OAuth Integration
 
-**Users can now send DICOM studies to OAuth-protected servers using the standard Orthanc UI!**
+**Send DICOM studies to OAuth-protected servers using the standard Orthanc UI.**
 
-No manual token management. No API calls. Just click "Send to DICOMWeb server" and OAuth authentication happens automatically in the background.
+This plugin enables seamless integration with OAuth-protected DICOMweb endpoints. Users interact with Orthanc exactly as they normally would—click "Send to DICOMWeb server" and OAuth authentication happens transparently. No manual token management. No API calls. No workflow changes.
 
 ### How It Works
 
@@ -116,7 +116,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Problem Solved
 
-Orthanc's DICOMweb plugin only supports HTTP Basic auth or static headers. This plugin enables Orthanc to connect to any OAuth2-protected DICOMweb server:
+Orthanc's built-in DICOMweb plugin only supports HTTP Basic auth or static headers, which prevents integration with modern cloud DICOM services that require OAuth2. This plugin bridges that gap by handling OAuth2 authentication transparently, enabling Orthanc users to send studies to cloud providers through the standard UI:
 
 - **Azure Health Data Services** (Microsoft Entra ID OAuth2) - Specialized provider with auto-detection
 - **Google Cloud Healthcare API** - Specialized provider with auto-detection

@@ -2,7 +2,7 @@
 
 This deployment creates a complete Orthanc DICOM server with **transparent OAuth authentication** connected to Azure Health Data Services DICOM service.
 
-> 📘 **New: Transparent OAuth Integration** - Users can now send DICOM studies to Azure using the standard Orthanc UI "Send to DICOMWeb server" button. OAuth authentication happens automatically in the background. See [TRANSPARENT-OAUTH-GUIDE.md](TRANSPARENT-OAUTH-GUIDE.md) for details.
+> 📘 **Transparent OAuth Integration** - Users send DICOM studies to Azure using the standard Orthanc UI "Send to DICOMWeb server" button. OAuth authentication happens automatically in the background. See [TRANSPARENT-OAUTH-GUIDE.md](TRANSPARENT-OAUTH-GUIDE.md) for details.
 
 ## 🎯 What This Deploys
 
@@ -21,6 +21,29 @@ This deployment creates a complete Orthanc DICOM server with **transparent OAuth
 - **Service Principal** with DICOM Data Owner permissions
 - **Client Credentials Flow** configured in Orthanc
 - **Token Management** via the dicomweb-oauth plugin
+
+## ⚙️ PostgreSQL Configuration
+
+The deployment automatically configures PostgreSQL for Orthanc compatibility:
+
+### Required Extensions
+- `pg_trgm` - Text search for DICOM metadata queries
+- `uuid-ossp` - UUID generation for database records
+
+### SSL Configuration
+- `require_secure_transport: off` - Disabled for simplified connectivity
+- For production, consider enabling SSL with proper certificate configuration
+
+### Orthanc Plugin Settings
+Critical settings in `orthanc.json`:
+- `Port: 5432` - **Hardcoded integer** (not environment variable)
+- `EnableSSL: false` - Matches Azure PostgreSQL SSL setting
+- Extensions are enabled via Bicep during deployment
+
+**Why these matter:**
+- Orthanc PostgreSQL plugin expects `Port` as integer, not string
+- `EnableSSL` must use capital letters (not `EnableSsl`)
+- Missing extensions cause silent connection failures
 
 ## 📋 Prerequisites
 

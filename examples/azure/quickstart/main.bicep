@@ -13,16 +13,6 @@ param location string
 @description('The name of the resource group to create')
 param resourceGroupName string
 
-@description('The container image to deploy (e.g., myregistry.azurecr.io/orthanc-oauth:latest)')
-param containerImage string
-
-@description('The name of the Azure Container Registry')
-param containerRegistryName string
-
-@description('Azure Container Registry admin password')
-@secure()
-param containerRegistryPassword string
-
 @description('The Azure AD tenant ID')
 param tenantId string
 
@@ -53,6 +43,9 @@ param orthancPassword string
 @description('Resource tags')
 param tags object = {}
 
+@description('Whether to deploy the Container App (set false for initial infra deployment)')
+param deployContainerApp bool = true
+
 // ========================================
 // Variables
 // ========================================
@@ -67,6 +60,10 @@ var logAnalyticsName = '${resourcePrefix}-logs'
 // Format: orthws + 13-char hash = 19 chars (within 3-24 limit)
 var healthcareWorkspaceName = toLower('orthws${uniqueString(subscription().subscriptionId, resourceGroupName)}')
 var dicomServiceName = '${resourcePrefix}-dicom'
+// Container registry name: must be globally unique, alphanumeric only, 5-50 chars
+// Remove hyphens from resourcePrefix since ACR names can't contain special characters
+var containerRegistryName = toLower(take(replace('${resourcePrefix}acr${uniqueString(subscription().subscriptionId, resourceGroupName)}', '-', ''), 50))
+var containerImage = '${containerRegistryName}.azurecr.io/orthanc-oauth:latest'
 
 // ========================================
 // Resource Group
@@ -76,6 +73,31 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
   tags: tags
+}
+
+// ========================================
+// Azure Container Registry
+// ========================================
+
+module containerRegistry './modules/container-registry.bicep' = {
+  scope: rg
+  name: 'containerRegistryDeployment'
+  params: {
+    registryName: containerRegistryName
+    location: location
+    tags: tags
+    sku: 'Basic'
+    adminUserEnabled: true
+  }
+}
+
+// Reference to ACR for getting credentials
+resource acrResource 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: containerRegistryName
+  scope: rg
+  dependsOn: [
+    containerRegistry
+  ]
 }
 
 // ========================================
@@ -198,6 +220,20 @@ module postgres 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.8.0' = {
 }
 
 // ========================================
+// PostgreSQL Configuration for Orthanc
+// ========================================
+module postgresConfig './modules/postgres-config.bicep' = {
+  scope: rg
+  name: 'postgresConfigDeployment'
+  params: {
+    postgresServerName: postgresServerName
+  }
+  dependsOn: [
+    postgres
+  ]
+}
+
+// ========================================
 // Container Apps Environment (AVM)
 // ========================================
 
@@ -216,8 +252,10 @@ module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1
 // ========================================
 // Container App (AVM)
 // ========================================
+// Deploy Container App only if deployContainerApp parameter is true
+// This allows for two-phase deployment: infra first, then container after image is built
 
-module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
+module containerApp 'br/public:avm/res/app/container-app:0.11.0' = if (deployContainerApp) {
   scope: rg
   name: 'containerAppDeployment'
   params: {
@@ -327,7 +365,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
         }
         {
           name: 'acr-password'
-          value: containerRegistryPassword
+          value: acrResource.listCredentials().passwords[0].value
         }
       ]
     }
@@ -351,8 +389,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
     ]
     registries: [
       {
-        server: '${containerRegistryName}.azurecr.io'
-        username: containerRegistryName
+        server: containerRegistry.outputs.loginServer
+        username: containerRegistry.outputs.adminUsername
         passwordSecretRef: 'acr-password'
       }
     ]
@@ -374,10 +412,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
 // ========================================
 
 output resourceGroupName string = rg.name
-output containerAppUrl string = containerApp.outputs.fqdn
+output containerAppUrl string = deployContainerApp ? containerApp.outputs.fqdn : ''
 output postgresServerFqdn string = postgres.outputs.fqdn
 output storageAccountName string = storageAccount.outputs.name
-output containerAppIdentityPrincipalId string = containerApp.outputs.systemAssignedMIPrincipalId
+output containerAppIdentityPrincipalId string = deployContainerApp ? containerApp.outputs.systemAssignedMIPrincipalId : ''
 
 // Healthcare workspace outputs
 output healthcareWorkspaceId string = healthcareWorkspace.outputs.workspaceId
@@ -390,3 +428,8 @@ output tokenEndpoint string = '${environment().authentication.loginEndpoint}${te
 
 // RBAC assignment
 output dicomRoleAssignmentId string = dicomRbac.outputs.roleAssignmentId
+
+// Container Registry outputs
+output containerRegistryName string = containerRegistry.outputs.name
+output containerRegistryLoginServer string = containerRegistry.outputs.loginServer
+output containerImage string = containerImage
