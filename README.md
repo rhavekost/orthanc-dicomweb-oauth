@@ -123,6 +123,32 @@ Orthanc's built-in DICOMweb plugin only supports HTTP Basic auth or static heade
 - **AWS HealthImaging** (OAuth2) - Basic support (full SigV4 pending)
 - **Any DICOMweb server behind Keycloak, Auth0, Okta, etc.** - Generic OAuth2 support
 
+## Deployment Options
+
+### Azure Quickstart (15 minutes)
+Perfect for demos and testing. Single command deployment.
+
+```bash
+cd examples/azure/quickstart
+./deploy.sh
+```
+
+**Features**: Public endpoints, client credentials, simple setup
+
+[Quickstart Guide →](examples/azure/quickstart/README.md)
+
+### Azure Production (20 minutes)
+Production-ready with enterprise security patterns.
+
+```bash
+cd examples/azure/production
+./deploy.sh
+```
+
+**Features**: VNet isolation, private endpoints, managed identity, zero secrets
+
+[Production Guide →](examples/azure/production/README.md)
+
 ## Quick Start
 
 ### Docker (Recommended)
