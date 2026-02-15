@@ -206,7 +206,7 @@ if [[ "$BUILD_IMAGE" == true ]]; then
     docker buildx build \
         --platform linux/amd64 \
         -t "$CONTAINER_IMAGE" \
-        -f examples/azure/quickstart/Dockerfile \
+        -f examples/azure/production/Dockerfile \
         --push \
         "$REPO_ROOT"
 
