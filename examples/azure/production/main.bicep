@@ -7,42 +7,11 @@ targetScope = 'subscription'
 @description('The name of the environment')
 param environmentName string
 
-@description('The Azure region where resources will be deployed')
+@description('The Azure region')
 param location string
 
-@description('The name of the resource group to create')
+@description('The name of the resource group')
 param resourceGroupName string
-
-@description('VNet address prefix')
-param vnetAddressPrefix string
-
-@description('Container Apps subnet prefix')
-param containerAppsSubnetPrefix string
-
-@description('Private Endpoints subnet prefix')
-param privateEndpointsSubnetPrefix string
-
-@description('The container image to deploy')
-param containerImage string
-
-@description('The name of the Azure Container Registry')
-param containerRegistryName string
-
-@description('The resource group containing the ACR')
-param containerRegistryResourceGroup string
-
-@description('The URL of the DICOM service')
-param dicomServiceUrl string
-
-@description('The OAuth scope for the DICOM service')
-param dicomScope string
-
-@description('PostgreSQL administrator username')
-param postgresAdminUsername string
-
-@description('PostgreSQL administrator password')
-@secure()
-param postgresAdminPassword string
 
 @description('Orthanc admin username')
 param orthancUsername string
@@ -51,11 +20,15 @@ param orthancUsername string
 @secure()
 param orthancPassword string
 
-@description('Enable private endpoints')
-param enablePrivateEndpoints bool = true
+@description('PostgreSQL admin username')
+param postgresAdminUsername string
 
-@description('Enable network isolation')
-param enableNetworkIsolation bool = true
+@description('PostgreSQL admin password')
+@secure()
+param postgresAdminPassword string
+
+@description('VNet address prefix')
+param vnetAddressPrefix string = '10.0.0.0/16'
 
 @description('Resource tags')
 param tags object = {}
@@ -65,11 +38,14 @@ param tags object = {}
 // ========================================
 
 var resourcePrefix = 'orthanc-${environmentName}'
-var postgresServerName = '${resourcePrefix}-db-${uniqueString(subscription().subscriptionId, resourceGroupName)}'
+var vnetName = '${resourcePrefix}-vnet'
 var storageAccountName = toLower(take(replace('${resourcePrefix}sa${uniqueString(subscription().subscriptionId, resourceGroupName)}', '-', ''), 24))
-var containerAppsEnvironmentName = '${resourcePrefix}-cae'
+var containerRegistryName = toLower(take(replace('${resourcePrefix}acr${uniqueString(subscription().subscriptionId, resourceGroupName)}', '-', ''), 50))
+var postgresServerName = '${resourcePrefix}-db-${uniqueString(subscription().subscriptionId, resourceGroupName)}'
+var healthcareWorkspaceName = toLower('orthws${uniqueString(subscription().subscriptionId, resourceGroupName)}')
+var dicomServiceName = '${resourcePrefix}-dicom'
 var containerAppName = '${resourcePrefix}-app'
-var logAnalyticsName = '${resourcePrefix}-logs'
+var environmentNameContainerApps = '${resourcePrefix}-cae'
 
 // ========================================
 // Resource Group
@@ -82,111 +58,71 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
 }
 
 // ========================================
-// Networking Module
+// Network Infrastructure
 // ========================================
 
-module networking './modules/networking.bicep' = {
+module network './modules/network.bicep' = {
   scope: rg
-  name: 'networkingDeployment'
+  name: 'networkDeployment'
   params: {
+    vnetName: vnetName
     location: location
-    namePrefix: resourcePrefix
     vnetAddressPrefix: vnetAddressPrefix
-    containerAppsSubnetPrefix: containerAppsSubnetPrefix
-    privateEndpointsSubnetPrefix: privateEndpointsSubnetPrefix
     tags: tags
   }
 }
-
-// ========================================
-// Private DNS Module
-// ========================================
 
 module privateDns './modules/private-dns.bicep' = {
   scope: rg
   name: 'privateDnsDeployment'
   params: {
-    vnetId: networking.outputs.vnetId
-    vnetName: networking.outputs.vnetName
-    tags: tags
-  }
-}
-
-// ========================================
-// Log Analytics Workspace (AVM)
-// ========================================
-
-module logAnalytics 'br/public:avm/res/operational-insights/workspace:0.9.1' = {
-  scope: rg
-  name: 'logAnalyticsDeployment'
-  params: {
-    name: logAnalyticsName
     location: location
+    vnetId: network.outputs.vnetId
     tags: tags
-    dataRetention: 90
-    skuName: 'PerGB2018'
   }
 }
 
 // ========================================
-// Storage Account (AVM) with Private Endpoint
+// Storage Account with Private Endpoint
 // ========================================
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.14.3' = {
+module storage './modules/storage.bicep' = {
   scope: rg
-  name: 'storageAccountDeployment'
+  name: 'storageDeployment'
   params: {
-    name: storageAccountName
+    storageAccountName: storageAccountName
     location: location
+    privateEndpointSubnetId: network.outputs.privateEndpointsSubnetId
+    blobPrivateDnsZoneId: privateDns.outputs.blobDnsZoneId
     tags: tags
-    kind: 'StorageV2'
-    skuName: 'Standard_LRS'
-    blobServices: {
-      containers: [
-        {
-          name: 'orthanc-dicom'
-          publicAccess: 'None'
-        }
-      ]
-    }
-    networkAcls: {
-      defaultAction: enableNetworkIsolation ? 'Deny' : 'Allow'
-      bypass: 'AzureServices'
-      virtualNetworkRules: enableNetworkIsolation ? [
-        {
-          id: networking.outputs.containerAppsSubnetId
-          action: 'Allow'
-        }
-      ] : []
-    }
-    privateEndpoints: enablePrivateEndpoints ? [
-      {
-        name: '${storageAccountName}-blob-pe'
-        subnetResourceId: networking.outputs.privateEndpointsSubnetId
-        service: 'blob'
-        privateDnsZoneGroup: {
-          privateDnsZoneGroupConfigs: [
-            {
-              privateDnsZoneResourceId: privateDns.outputs.blobDnsZoneId
-            }
-          ]
-        }
-      }
-    ] : []
   }
-}
-
-// Reference to storage account for getting keys
-resource storageAccountResource 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
-  name: storageAccountName
-  scope: rg
   dependsOn: [
-    storageAccount
+    privateDns
   ]
 }
 
 // ========================================
-// PostgreSQL Flexible Server (AVM) with Private Endpoint
+// Container Registry with Private Endpoint
+// ========================================
+
+module containerRegistry './modules/container-registry.bicep' = {
+  scope: rg
+  name: 'containerRegistryDeployment'
+  params: {
+    registryName: containerRegistryName
+    location: location
+    privateEndpointSubnetId: network.outputs.privateEndpointsSubnetId
+    acrPrivateDnsZoneId: privateDns.outputs.acrDnsZoneId
+    sku: 'Basic'
+    tags: tags
+  }
+  dependsOn: [
+    privateDns
+  ]
+}
+
+// ========================================
+// PostgreSQL Flexible Server with VNet Integration
 // ========================================
 
 module postgres 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.8.0' = {
@@ -196,225 +132,101 @@ module postgres 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.8.0' = {
     name: postgresServerName
     location: location
     tags: tags
-    skuName: 'Standard_D2ds_v4'
-    tier: 'GeneralPurpose'
-    storageSizeGB: 128
+    skuName: 'Standard_B2s'
+    tier: 'Burstable'
+    storageSizeGB: 32
     version: '15'
     administratorLogin: postgresAdminUsername
     administratorLoginPassword: postgresAdminPassword
+    highAvailability: 'Disabled'
     databases: [
       {
         name: 'orthanc'
       }
     ]
-    firewallRules: enableNetworkIsolation ? [] : [
-      {
-        name: 'AllowAllAzureIPs'
-        startIpAddress: '0.0.0.0'
-        endIpAddress: '0.0.0.0'
-      }
-    ]
-    delegatedSubnetResourceId: enablePrivateEndpoints ? networking.outputs.privateEndpointsSubnetId : null
-    privateDnsZoneArmResourceId: enablePrivateEndpoints ? privateDns.outputs.postgresDnsZoneId : null
+    delegatedSubnetResourceId: network.outputs.postgresSubnetId
+    privateDnsZoneArmResourceId: privateDns.outputs.postgresDnsZoneId
   }
+  dependsOn: [
+    network
+    privateDns
+  ]
+}
+
+module postgresConfig '../quickstart/modules/postgres-config.bicep' = {
+  scope: rg
+  name: 'postgresConfigDeployment'
+  params: {
+    postgresServerName: postgresServerName
+  }
+  dependsOn: [
+    postgres
+  ]
 }
 
 // ========================================
-// Container Apps Environment (AVM) with VNet
+// Healthcare Workspace and DICOM Service
 // ========================================
 
-module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.1' = {
+module healthcareWorkspace '../quickstart/modules/healthcare-workspace.bicep' = {
   scope: rg
-  name: 'containerAppsEnvDeployment'
+  name: 'healthcareWorkspaceDeployment'
   params: {
-    name: containerAppsEnvironmentName
+    workspaceName: healthcareWorkspaceName
+    dicomServiceName: dicomServiceName
     location: location
     tags: tags
-    logAnalyticsWorkspaceResourceId: logAnalytics.outputs.resourceId
-    infrastructureSubnetId: networking.outputs.containerAppsSubnetId
-    internal: enableNetworkIsolation
-    workloadProfiles: [
-      {
-        name: 'Consumption'
-        workloadProfileType: 'Consumption'
-      }
-    ]
   }
 }
 
 // ========================================
-// Container App (AVM) with Managed Identity
+// Container App with Managed Identity
 // ========================================
 
-module containerApp 'br/public:avm/res/app/container-app:0.11.0' = {
+var containerImage = '${containerRegistryName}.azurecr.io/orthanc-oauth:latest'
+var postgresConnectionString = 'host=${postgresServerName}.postgres.database.azure.com port=5432 dbname=orthanc user=${postgresAdminUsername} password=${postgresAdminPassword} sslmode=require'
+
+module containerApp './modules/container-app.bicep' = {
   scope: rg
   name: 'containerAppDeployment'
   params: {
-    name: containerAppName
+    containerAppName: containerAppName
+    environmentName: environmentNameContainerApps
     location: location
+    containerImage: containerImage
+    containerAppsSubnetId: network.outputs.containerAppsSubnetId
+    orthancUsername: orthancUsername
+    orthancPassword: orthancPassword
+    postgresConnectionString: postgresConnectionString
+    storageAccountName: storageAccountName
+    storageContainerName: storage.outputs.containerName
+    dicomServiceUrl: healthcareWorkspace.outputs.dicomServiceUrl
     tags: tags
-    environmentResourceId: containerAppsEnvironment.outputs.resourceId
-    workloadProfileName: 'Consumption'
-    containers: [
-      {
-        name: 'orthanc'
-        image: containerImage
-        resources: {
-          cpu: json('2.0')
-          memory: '4Gi'
-        }
-        env: [
-          {
-            name: 'ORTHANC__POSTGRESQL__HOST'
-            value: postgres.outputs.fqdn
-          }
-          {
-            name: 'ORTHANC__POSTGRESQL__PORT'
-            value: '5432'
-          }
-          {
-            name: 'ORTHANC__POSTGRESQL__DATABASE'
-            value: 'orthanc'
-          }
-          {
-            name: 'ORTHANC__POSTGRESQL__USERNAME'
-            value: postgresAdminUsername
-          }
-          {
-            name: 'ORTHANC__POSTGRESQL__PASSWORD'
-            secretRef: 'postgres-password'
-          }
-          {
-            name: 'ORTHANC__AZURE_BLOB_STORAGE__CONNECTION_STRING'
-            secretRef: 'storage-connection-string'
-          }
-          {
-            name: 'ORTHANC__AZURE_BLOB_STORAGE__CONTAINER'
-            value: 'orthanc-dicom'
-          }
-          {
-            name: 'DICOM_SERVICE_URL'
-            value: dicomServiceUrl
-          }
-          {
-            name: 'DICOM_SCOPE'
-            value: dicomScope
-          }
-          {
-            name: 'USE_MANAGED_IDENTITY'
-            value: 'true'
-          }
-          {
-            name: 'ORTHANC_USERNAME'
-            value: orthancUsername
-          }
-          {
-            name: 'ORTHANC_PASSWORD'
-            secretRef: 'orthanc-password'
-          }
-        ]
-        probes: [
-          {
-            type: 'Liveness'
-            httpGet: {
-              path: '/system'
-              port: 8042
-            }
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          }
-          {
-            type: 'Readiness'
-            httpGet: {
-              path: '/system'
-              port: 8042
-            }
-            initialDelaySeconds: 10
-            periodSeconds: 5
-          }
-        ]
-      }
-    ]
-    secrets: {
-      secureList: [
-        {
-          name: 'postgres-password'
-          value: postgresAdminPassword
-        }
-        {
-          name: 'storage-connection-string'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountResource.name};AccountKey=${storageAccountResource.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-        }
-        {
-          name: 'orthanc-password'
-          value: orthancPassword
-        }
-      ]
-    }
-    ingressExternal: !enableNetworkIsolation
-    ingressTargetPort: 8042
-    ingressTransport: 'http'
-    ingressAllowInsecure: false
-    trafficLatestRevision: true
-    trafficWeight: 100
-    scaleMinReplicas: 2
-    scaleMaxReplicas: 10
-    scaleRules: [
-      {
-        name: 'http-rule'
-        http: {
-          metadata: {
-            concurrentRequests: '50'
-          }
-        }
-      }
-      {
-        name: 'cpu-rule'
-        custom: {
-          type: 'cpu'
-          metadata: {
-            type: 'Utilization'
-            value: '75'
-          }
-        }
-      }
-    ]
-    registries: [
-      {
-        server: '${containerRegistryName}.azurecr.io'
-        identity: 'system'
-      }
-    ]
-    managedIdentities: {
-      systemAssigned: true
-    }
   }
+  dependsOn: [
+    network
+    storage
+    postgres
+    healthcareWorkspace
+  ]
 }
 
 // ========================================
-// Role Assignments
+// RBAC Assignments
 // ========================================
 
-// Grant Container App system identity ACR Pull role
-module acrPullRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.1' = {
-  scope: resourceGroup(containerRegistryResourceGroup)
-  name: 'acrPullRoleAssignment'
-  params: {
-    principalId: containerApp.outputs.systemAssignedMIPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
-    resourceId: subscriptionResourceId(containerRegistryResourceGroup, 'Microsoft.ContainerRegistry/registries', containerRegistryName)
-  }
-}
-
-// Grant Container App managed identity Storage Blob Data Contributor role
-module storageBlobRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.1' = {
+module rbacAssignments './modules/rbac-assignments.bicep' = {
   scope: rg
-  name: 'storageBlobRoleAssignment'
+  name: 'rbacAssignmentsDeployment'
   params: {
-    principalId: containerApp.outputs.systemAssignedMIPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe') // Storage Blob Data Contributor
-    resourceId: storageAccount.outputs.resourceId
+    containerAppPrincipalId: containerApp.outputs.containerAppPrincipalId
+    dicomServiceId: healthcareWorkspace.outputs.dicomServiceId
+    storageAccountId: storage.outputs.storageAccountId
+    containerRegistryId: containerRegistry.outputs.registryId
   }
+  dependsOn: [
+    containerApp
+  ]
 }
 
 // ========================================
@@ -422,9 +234,10 @@ module storageBlobRoleAssignment 'br/public:avm/ptn/authorization/resource-role-
 // ========================================
 
 output resourceGroupName string = rg.name
-output containerAppUrl string = containerApp.outputs.fqdn
-output containerAppIdentityPrincipalId string = containerApp.outputs.systemAssignedMIPrincipalId
-output postgresServerFqdn string = postgres.outputs.fqdn
-output storageAccountName string = storageAccount.outputs.name
-output vnetId string = networking.outputs.vnetId
-output vnetName string = networking.outputs.vnetName
+output containerAppUrl string = containerApp.outputs.containerAppUrl
+output containerRegistryName string = containerRegistry.outputs.registryName
+output containerRegistryLoginServer string = containerRegistry.outputs.loginServer
+output dicomServiceUrl string = healthcareWorkspace.outputs.dicomServiceUrl
+output postgresServerFqdn string = '${postgresServerName}.postgres.database.azure.com'
+output storageAccountName string = storage.outputs.storageAccountName
+output vnetId string = network.outputs.vnetId

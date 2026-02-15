@@ -76,7 +76,7 @@ resource orthancContainer 'Microsoft.Storage/storageAccounts/blobServices/contai
 // Private Endpoint
 // ========================================
 
-module blobPrivateEndpoint '../private-endpoint.bicep' = {
+module blobPrivateEndpoint './private-endpoint.bicep' = {
   name: '${storageAccountName}-blob-pe'
   params: {
     privateEndpointName: '${storageAccountName}-blob-pe'
