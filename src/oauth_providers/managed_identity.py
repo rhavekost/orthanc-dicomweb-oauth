@@ -1,8 +1,11 @@
 """Azure Managed Identity OAuth provider."""
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from src.oauth_providers.base import OAuthProvider, OAuthToken
+from src.oauth_providers.base import OAuthConfig, OAuthProvider, OAuthToken
 from src.structured_logger import structured_logger
+
+if TYPE_CHECKING:
+    from src.http_client import HttpClient
 
 
 class AzureManagedIdentityProvider(OAuthProvider):
@@ -13,17 +16,32 @@ class AzureManagedIdentityProvider(OAuthProvider):
     Automatically works in Azure environments with managed identity enabled.
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(
+        self, config: Dict[str, Any], http_client: Optional["HttpClient"] = None
+    ):
         """
         Initialize Azure Managed Identity provider.
 
         Args:
             config: Configuration dictionary with Scope and VerifySSL
+            http_client: Optional HTTP client (defaults to RequestsHttpClient)
         """
-        self.scope = config.get(
-            "Scope", "https://dicom.healthcareapis.azure.com/.default"
+        # Create minimal OAuthConfig to satisfy parent class
+        oauth_config = OAuthConfig(
+            token_endpoint="",  # Not used by managed identity
+            client_id="",  # Not used by managed identity
+            client_secret="",  # Not used by managed identity  # nosec B106
+            scope=config.get(
+                "Scope", "https://dicom.healthcareapis.azure.com/.default"
+            ),
+            verify_ssl=config.get("VerifySSL", True),
         )
-        self.verify_ssl = config.get("VerifySSL", True)
+        super().__init__(oauth_config, http_client)
+
+        # Store for convenient access
+        self.scope = self.config.scope
+        self.verify_ssl = self.config.verify_ssl
+
         structured_logger.info(
             "AzureManagedIdentityProvider initialized", scope=self.scope
         )
