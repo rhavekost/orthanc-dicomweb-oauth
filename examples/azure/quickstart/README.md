@@ -2,10 +2,12 @@
 
 Deploy Orthanc with OAuth plugin to Azure Container Apps using client credentials authentication.
 
+> 📘 **NEW: Transparent OAuth Integration** - Users can send DICOM studies to Azure using the standard Orthanc UI "Send to DICOMWeb server" button. OAuth authentication happens automatically in the background. See [TRANSPARENT-OAUTH-GUIDE.md](TRANSPARENT-OAUTH-GUIDE.md) for details.
+
 ## Overview
 
 This quickstart deploys Orthanc to Azure Container Apps with:
-- **Authentication**: OAuth 2.0 client credentials flow
+- **Authentication**: OAuth 2.0 client credentials flow (transparent to users)
 - **Database**: Azure Database for PostgreSQL Flexible Server
 - **Storage**: Azure Blob Storage
 - **DICOM Service**: Azure Health Data Services DICOM
