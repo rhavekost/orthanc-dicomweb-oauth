@@ -209,11 +209,269 @@ def handle_rest_api_servers(output: Any, uri: str, **_request: Any) -> None:
         output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
-def handle_rest_api_stow(output: Any, uri: str, **request: Any) -> None:
+def _extract_server_name(uri: str) -> tuple[str | None, str | None]:
+    """Extract server name from URI path.
+
+    Args:
+        uri: Request URI path
+
+    Returns:
+        Tuple of (server_name, error_message). If successful, error is None.
     """
+    parts = uri.split("/")
+    if len(parts) < 5:
+        return None, "Server name not specified"
+    return parts[3], None
+
+
+def _build_multipart_from_resources(
+    resources: list[str], boundary: str, orthanc: Any
+) -> tuple[bytes | None, str | None]:
+    """Build multipart DICOM message from resource IDs.
+
+    Args:
+        resources: List of Orthanc resource IDs
+        boundary: MIME boundary string
+        orthanc: Orthanc module
+
+    Returns:
+        Tuple of (multipart_body, error_message). If successful, error is None.
+    """
+    multipart_data = []
+    for resource_id in resources:
+        try:
+            dicom_data = orthanc.RestApiGet(f"/instances/{resource_id}/file")
+            part_header = f"--{boundary}\r\n"
+            part_header += "Content-Type: application/dicom\r\n\r\n"
+            multipart_data.append(part_header.encode("utf-8"))
+            multipart_data.append(dicom_data)
+            multipart_data.append(b"\r\n")
+        except Exception as e:
+            logger.error(f"Failed to get DICOM file for {resource_id}: {e}")
+            return None, f"Failed to get DICOM file: {str(e)}"
+
+    multipart_data.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(multipart_data), None
+
+
+def _get_stow_url(context: Any, server_name: str, output: Any) -> str | None:
+    """Get STOW-RS URL for server.
+
+    Args:
+        context: Plugin context
+        server_name: Name of the configured server
+        output: Orthanc output for error responses
+
+    Returns:
+        STOW-RS URL, or None if not found (error already sent to output).
+    """
+    server_url = context.get_server_url(server_name)
+    if not server_url:
+        output.AnswerBuffer(
+            json.dumps({"error": f"Server URL not found for '{server_name}'"}),
+            "application/json",
+        )
+        return None
+    return f"{server_url.rstrip('/')}/studies"
+
+
+def _get_oauth_token(context: Any, server_name: str, output: Any) -> str | None:
+    """Get OAuth token for server.
+
+    Args:
+        context: Plugin context
+        server_name: Name of the configured server
+        output: Orthanc output for error responses
+
+    Returns:
+        OAuth token string, or None if failed (error sent to output).
+    """
+    token_manager = context.get_token_manager(server_name)
+    if not token_manager:
+        output.AnswerBuffer(
+            json.dumps({"error": f"Server '{server_name}' not configured"}),
+            "application/json",
+        )
+        return None
+
+    try:
+        token = token_manager.get_token()
+        return str(token) if token else None
+    except TokenAcquisitionError as e:
+        logger.error(f"Failed to acquire token for '{server_name}': {e}")
+        output.AnswerBuffer(
+            json.dumps({"error": "OAuth token acquisition failed", "details": str(e)}),
+            "application/json",
+        )
+        return None
+
+
+def _prepare_request_body_and_headers(
+    content_type: str, body: bytes, orthanc: Any
+) -> tuple[bytes | None, dict[str, str] | None, str | None]:
+    """Prepare request body and headers based on content type.
+
+    Args:
+        content_type: Request content type
+        body: Request body as bytes
+        orthanc: Orthanc module
+
+    Returns:
+        Tuple of (body, headers_dict, error_message). If successful, error is None.
+    """
+    if "multipart/related" in content_type:
+        # DICOMweb plugin is sending pre-formatted multipart DICOM data
+        logger.info(f"Forwarding multipart DICOM data ({len(body)} bytes)")
+        extra_headers = {
+            "Content-Type": content_type,
+            "Accept": "application/dicom+json",
+        }
+        return body, extra_headers, None
+    else:
+        # JSON request with resource IDs - build multipart ourselves
+        return _prepare_json_request(body, orthanc)
+
+
+def _prepare_json_request(
+    body: bytes, orthanc: Any
+) -> tuple[bytes | None, dict[str, str] | None, str | None]:
+    """Prepare DICOM data from JSON request with resource IDs.
+
+    Args:
+        body: Request body as bytes
+        orthanc: Orthanc module
+
+    Returns:
+        Tuple of (body, headers_dict, error_message). If successful, error is None.
+    """
+    import uuid
+
+    try:
+        body_str = body.decode("utf-8") if isinstance(body, bytes) else body
+        request_data = json.loads(body_str) if body_str else {}
+        resources = request_data.get("Resources", [])
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        return None, None, f"Invalid request body: {type(e).__name__}"
+
+    if not resources:
+        return None, None, "No resources specified"
+
+    logger.info(f"Building multipart from {len(resources)} resources")
+
+    boundary = uuid.uuid4().hex
+    multipart_body, error = _build_multipart_from_resources(
+        resources, boundary, orthanc
+    )
+    if error:
+        return None, None, error
+
+    content_type = f'multipart/related; type="application/dicom"; boundary={boundary}'
+    headers_dict = {"Content-Type": content_type, "Accept": "application/dicom+json"}
+    return multipart_body, headers_dict, None
+
+
+def _send_dicom_to_server(
+    stow_url: str, body: bytes, headers: dict[str, str], output: Any
+) -> None:
+    """Send DICOM data to remote server and handle response.
+
+    Args:
+        stow_url: STOW-RS endpoint URL
+        body: DICOM data as bytes
+        headers: HTTP headers including OAuth token
+        output: Orthanc output object for response
+    """
+    import requests
+
+    try:
+        response = requests.post(stow_url, data=body, headers=headers, timeout=300)
+        response.raise_for_status()
+
+        # Log Azure's response for debugging
+        content_type_header = response.headers.get("Content-Type")
+        logger.info(
+            f"Azure response status: {response.status_code}, "
+            f"Content-Type: {content_type_header}"
+        )
+        logger.info(f"Azure response length: {len(response.content)} bytes")
+
+        # Return Azure's response (use .content for binary-safe handling)
+        output.AnswerBuffer(
+            response.content,
+            response.headers.get("Content-Type", "application/json"),
+        )
+        logger.info("Successfully sent DICOM data to remote server")
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send to remote DICOM server: {e}")
+        error_details = {
+            "error": "Failed to send to remote DICOM server",
+            "details": str(e),
+            "status_code": getattr(e.response, "status_code", None)
+            if hasattr(e, "response")
+            else None,
+            "response_text": e.response.text
+            if hasattr(e, "response") and e.response
+            else None,
+        }
+        output.AnswerBuffer(json.dumps(error_details), "application/json")
+
+
+def _process_stow_request(output: Any, uri: str, request: Any, orthanc: Any) -> None:
+    """Process STOW-RS request with OAuth.
+
+    Args:
+        output: Orthanc output object
+        uri: Request URI
+        request: Request data
+        orthanc: Orthanc module
+    """
+    context = get_plugin_context()
+
+    # Extract server name from URI
+    server_name, error = _extract_server_name(uri)
+    if error or server_name is None:
+        output.AnswerBuffer(
+            json.dumps({"error": error or "Invalid server name"}),
+            "application/json",
+        )
+        return
+
+    # Get OAuth token and server URL
+    token = _get_oauth_token(context, server_name, output)
+    if not token:
+        return  # Error already sent to output
+
+    stow_url = _get_stow_url(context, server_name, output)
+    if not stow_url:
+        return  # Error already sent to output
+
+    # Prepare request body and headers based on content type
+    content_type = request.get("headers", {}).get("content-type", "")
+    request_body = request.get("body", b"")
+
+    body, extra_headers, error = _prepare_request_body_and_headers(
+        content_type, request_body, orthanc
+    )
+    if error or body is None or extra_headers is None:
+        output.AnswerBuffer(
+            json.dumps({"error": error or "Failed to prepare request"}),
+            "application/json",
+        )
+        return
+
+    # Add OAuth token to headers
+    headers = {"Authorization": f"Bearer {token}", **extra_headers}
+
+    # Send DICOM data to remote server
+    _send_dicom_to_server(stow_url, body, headers, output)
+
+
+def handle_rest_api_stow(output: Any, uri: str, **request: Any) -> None:
+    """Proxy STOW-RS requests with automatic OAuth token injection.
+
     POST /dicomweb-oauth/servers/{name}/stow
 
-    Proxy STOW-RS requests with automatic OAuth token injection.
     Acts as a transparent proxy between DICOMweb plugin and remote DICOM server.
 
     Request body: Same as Orthanc's native STOW-RS endpoint
@@ -227,162 +485,13 @@ def handle_rest_api_stow(output: Any, uri: str, **request: Any) -> None:
     import orthanc
 
     try:
-        context = get_plugin_context()
         print("DEBUG: Got plugin context", flush=True)
         print(f"DEBUG: Request headers: {request.get('headers', {})}", flush=True)
         body_len = len(request.get("body", b"")) if request.get("body") else 0
         print(f"DEBUG: Request body length: {body_len}", flush=True)
 
-        # Extract server name from URI: /dicomweb-oauth/servers/{name}/stow
-        parts = uri.split("/")
-        if len(parts) < 5:
-            output.AnswerBuffer(
-                json.dumps({"error": "Server name not specified"}), "application/json"
-            )
-            return
-
-        server_name = parts[3]
-
-        # Get token manager for this server
-        token_manager = context.get_token_manager(server_name)
-        if not token_manager:
-            output.AnswerBuffer(
-                json.dumps({"error": f"Server '{server_name}' not configured"}),
-                "application/json",
-            )
-            return
-
-        # Get OAuth token
-        try:
-            token = token_manager.get_token()
-        except TokenAcquisitionError as e:
-            logger.error(f"Failed to acquire token for '{server_name}': {e}")
-            output.AnswerBuffer(
-                json.dumps(
-                    {"error": "OAuth token acquisition failed", "details": str(e)}
-                ),
-                "application/json",
-            )
-            return
-
-        # Check if request is multipart/related (DICOMweb plugin sends DICOM directly)
-        # or JSON (API calls send resource IDs)
-        content_type = request.get("headers", {}).get("content-type", "")
-        body = request.get("body", b"")
-
-        # Get server URL
-        server_url = context.get_server_url(server_name)
-        if not server_url:
-            output.AnswerBuffer(
-                json.dumps({"error": f"Server URL not found for '{server_name}'"}),
-                "application/json",
-            )
-            return
-
-        # Build STOW-RS URL (append /studies for STOW-RS endpoint)
-        stow_url = f"{server_url.rstrip('/')}/studies"
-
-        import requests
-
-        if "multipart/related" in content_type:
-            # DICOMweb plugin is sending pre-formatted multipart DICOM data
-            # Forward it directly to Azure with OAuth token
-            logger.info(
-                f"Forwarding multipart DICOM data ({len(body)} bytes) to {stow_url}"
-            )
-
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": content_type,
-                "Accept": "application/dicom+json",
-            }
-        else:
-            # JSON request with resource IDs - build multipart ourselves
-            try:
-                body_str = body.decode("utf-8") if isinstance(body, bytes) else body
-                request_data = json.loads(body_str) if body_str else {}
-                resources = request_data.get("Resources", [])
-            except (UnicodeDecodeError, json.JSONDecodeError) as e:
-                output.AnswerBuffer(
-                    json.dumps({"error": f"Invalid request body: {type(e).__name__}"}),
-                    "application/json",
-                )
-                return
-
-            if not resources:
-                output.AnswerBuffer(
-                    json.dumps({"error": "No resources specified"}), "application/json"
-                )
-                return
-
-            logger.info(f"Building multipart from {len(resources)} resources")
-
-            import uuid
-
-            boundary = uuid.uuid4().hex
-
-            # Build multipart message
-            multipart_data = []
-            for resource_id in resources:
-                try:
-                    dicom_data = orthanc.RestApiGet(f"/instances/{resource_id}/file")
-                    part_header = f"--{boundary}\r\n"
-                    part_header += "Content-Type: application/dicom\r\n\r\n"
-                    multipart_data.append(part_header.encode("utf-8"))
-                    multipart_data.append(dicom_data)
-                    multipart_data.append(b"\r\n")
-                except Exception as e:
-                    logger.error(f"Failed to get DICOM file for {resource_id}: {e}")
-                    output.AnswerBuffer(
-                        json.dumps({"error": f"Failed to get DICOM file: {str(e)}"}),
-                        "application/json",
-                    )
-                    return
-
-            multipart_data.append(f"--{boundary}--\r\n".encode("utf-8"))
-            body = b"".join(multipart_data)
-
-            content_type_value = (
-                f'multipart/related; type="application/dicom"; ' f"boundary={boundary}"
-            )
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": content_type_value,
-                "Accept": "application/dicom+json",
-            }
-
-        try:
-            response = requests.post(stow_url, data=body, headers=headers, timeout=300)
-            response.raise_for_status()
-
-            # Log Azure's response for debugging
-            content_type_header = response.headers.get("Content-Type")
-            logger.info(
-                f"Azure response status: {response.status_code}, "
-                f"Content-Type: {content_type_header}"
-            )
-            logger.info(f"Azure response length: {len(response.content)} bytes")
-
-            # Return Azure's response (use .content for binary-safe handling)
-            output.AnswerBuffer(
-                response.content,
-                response.headers.get("Content-Type", "application/json"),
-            )
-            logger.info(f"Successfully sent {len(resources)} instances to Azure DICOM")
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to send to Azure DICOM: {e}")
-            error_details = {
-                "error": "Failed to send to Azure DICOM",
-                "details": str(e),
-                "status_code": getattr(e.response, "status_code", None)
-                if hasattr(e, "response")
-                else None,
-                "response_text": e.response.text
-                if hasattr(e, "response") and e.response
-                else None,
-            }
-            output.AnswerBuffer(json.dumps(error_details), "application/json")
+        # Process the STOW request with OAuth
+        _process_stow_request(output, uri, request, orthanc)
 
     except Exception as e:
         logger.error(f"STOW-RS proxy failed: {type(e).__name__}: {e}", exc_info=True)
@@ -643,6 +752,7 @@ if _ORTHANC_AVAILABLE and orthanc is not None:
         # This intercepts /dicom-web/servers/{name}/stow and adds OAuth automatically
         # Test endpoint to verify registration works
         def test_handler(output: Any, uri: str, **request: Any) -> None:
+            """Test handler to verify REST endpoint registration."""
             print(f"DEBUG: TEST HANDLER CALLED! URI: {uri}", flush=True)
             output.AnswerBuffer(
                 json.dumps({"test": "success", "uri": uri}), "application/json"
