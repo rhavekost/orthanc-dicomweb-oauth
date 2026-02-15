@@ -3,9 +3,6 @@
 // ========================================
 // Creates and links Private DNS zones to VNet
 
-@description('The location for the resources')
-param location string
-
 @description('The ID of the VNet to link DNS zones to')
 param vnetId string
 
@@ -23,7 +20,7 @@ resource postgresDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
 }
 
 resource blobDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: 'privatelink.blob.core.windows.net'
+  name: 'privatelink.blob.${environment().suffixes.storage}'
   location: 'global'
   tags: tags
 }

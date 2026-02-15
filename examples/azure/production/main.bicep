@@ -76,7 +76,6 @@ module privateDns './modules/private-dns.bicep' = {
   scope: rg
   name: 'privateDnsDeployment'
   params: {
-    location: location
     vnetId: network.outputs.vnetId
     tags: tags
   }
@@ -96,9 +95,6 @@ module storage './modules/storage.bicep' = {
     blobPrivateDnsZoneId: privateDns.outputs.blobDnsZoneId
     tags: tags
   }
-  dependsOn: [
-    privateDns
-  ]
 }
 
 // ========================================
@@ -116,9 +112,6 @@ module containerRegistry './modules/container-registry.bicep' = {
     sku: 'Basic'
     tags: tags
   }
-  dependsOn: [
-    privateDns
-  ]
 }
 
 // ========================================
@@ -147,10 +140,6 @@ module postgres 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.8.0' = {
     delegatedSubnetResourceId: network.outputs.postgresSubnetId
     privateDnsZoneArmResourceId: privateDns.outputs.postgresDnsZoneId
   }
-  dependsOn: [
-    network
-    privateDns
-  ]
 }
 
 module postgresConfig '../quickstart/modules/postgres-config.bicep' = {
@@ -203,12 +192,6 @@ module containerApp './modules/container-app.bicep' = {
     dicomServiceUrl: healthcareWorkspace.outputs.dicomServiceUrl
     tags: tags
   }
-  dependsOn: [
-    network
-    storage
-    postgres
-    healthcareWorkspace
-  ]
 }
 
 // ========================================
@@ -224,9 +207,6 @@ module rbacAssignments './modules/rbac-assignments.bicep' = {
     storageAccountId: storage.outputs.storageAccountId
     containerRegistryId: containerRegistry.outputs.registryId
   }
-  dependsOn: [
-    containerApp
-  ]
 }
 
 // ========================================
