@@ -14,8 +14,8 @@ param privateEndpointSubnetId string
 @description('The ID of the ACR Private DNS zone')
 param acrPrivateDnsZoneId string
 
-@description('The SKU for the registry')
-param sku string = 'Basic'
+@description('The SKU for the registry (Standard or Premium required for private endpoints)')
+param sku string = 'Standard'
 
 @description('Disable admin user')
 param adminUserEnabled bool = false

@@ -109,7 +109,6 @@ module containerRegistry './modules/container-registry.bicep' = {
     location: location
     privateEndpointSubnetId: network.outputs.privateEndpointsSubnetId
     acrPrivateDnsZoneId: privateDns.outputs.acrDnsZoneId
-    sku: 'Basic'
     tags: tags
   }
 }
