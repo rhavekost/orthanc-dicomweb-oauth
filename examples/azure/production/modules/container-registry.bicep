@@ -20,8 +20,8 @@ param sku string = 'Standard'
 @description('Disable admin user')
 param adminUserEnabled bool = false
 
-@description('Disable public network access')
-param publicNetworkAccess string = 'Disabled'
+@description('Public network access (Disabled requires Premium SKU, Standard requires Enabled)')
+param publicNetworkAccess string = 'Enabled'
 
 @description('Resource tags')
 param tags object = {}
