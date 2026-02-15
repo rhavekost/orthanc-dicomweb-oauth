@@ -16,14 +16,16 @@ Completed comprehensive audit of all documentation following successful implemen
 - ✅ **Deleted `src/ui_override.js`** - ExtendOrthancExplorer approach that doesn't work with Orthanc Explorer 2
 - ✅ **Kept explanatory comment** in `src/dicomweb_oauth_plugin.py:768-772` documenting why ExtendOrthancExplorer doesn't work
 
-#### Documented But Kept (Non-Functional Code)
-- ⚠️ **`on_outgoing_http_request()` function** (lines 111-179) - HTTP filter approach
-  - **Attempted:** Intercept outgoing HTTP requests via `RegisterOnOutgoingHttpRequestFilter`
-  - **Why it failed:**
-    - Not available in all Orthanc SDK versions (requires >= 1.12.1)
-    - Even when available, filter sees requests AFTER routing decisions are made
-    - Cannot properly intercept DICOMweb plugin's internal HTTP calls
-  - **Status:** Code remains but is not used; warning logged if SDK doesn't support it (lines 703-712)
+#### Removed HTTP Filter Approach
+- ✅ **Deleted `on_outgoing_http_request()` function** - HTTP filter approach (formerly lines 111-179)
+- ✅ **Deleted HTTP filter registration code** - SDK check and registration (formerly lines 703-712)
+- ✅ **Deleted test file** - `tests/test_plugin_integration.py` testing non-functional HTTP filter
+- ✅ **Removed all references** - Updated docstrings mentioning `RegisterOnOutgoingHttpRequestFilter`
+  - **Why it was deleted:**
+    - Not available in all Orthanc SDK versions
+    - Filter called too late to intercept DICOMweb plugin requests
+    - Cannot modify plugin-to-plugin communication
+    - Keeping non-functional code is confusing
   - **Working solution:** REST endpoint proxy at `/oauth-dicom-web/servers/*/studies` (lines 295-450)
 
 ### 2. Documentation Updates
@@ -181,14 +183,17 @@ Located in `src/dicomweb_oauth_plugin.py:768-772`:
 
 ### 2. HTTP Request Filter (`on_outgoing_http_request`)
 - **Attempt:** Use `RegisterOnOutgoingHttpRequestFilter` to intercept outgoing HTTP requests
-- **Implementation:** Lines 111-179 in `src/dicomweb_oauth_plugin.py`
+- **Implementation:** Formerly lines 111-179 in `src/dicomweb_oauth_plugin.py` (DELETED)
 - **Why it failed:**
   - SDK function not available in all Orthanc versions (needs >= 1.12.1)
   - Filter is called too late in request lifecycle
   - Cannot modify requests from DICOMweb plugin effectively
   - Even when available, doesn't work for internal plugin-to-plugin communication
-- **Status:** ⚠️ Code remains (lines 111-179) but is non-functional; warning logged (lines 703-712)
-- **Evidence:** Warning message at line 709: "RegisterOnOutgoingHttpRequestFilter not available - automatic OAuth token injection will not work"
+- **Status:** ✅ COMPLETELY REMOVED - All code, tests, and references deleted
+  - Deleted: `on_outgoing_http_request()` function
+  - Deleted: Registration code with SDK check
+  - Deleted: `tests/test_plugin_integration.py`
+  - Updated: All docstring references
 
 ### 3. Working Solution: REST Endpoint Proxy ✅
 - **Approach:** Register REST endpoint that DICOMweb plugin calls directly
@@ -200,7 +205,7 @@ Located in `src/dicomweb_oauth_plugin.py:768-772`:
 ## Audit Checklist
 
 - [x] Remove failed code paths (ui_override.js - DELETED)
-- [x] Document HTTP filter approach (still in code but non-functional - DOCUMENTED)
+- [x] Remove HTTP filter approach (on_outgoing_http_request - COMPLETELY DELETED)
 - [x] Update main README.md with transparent OAuth
 - [x] Update quickstart README.md with prominent reference
 - [x] Verify TRANSPARENT-OAUTH-GUIDE.md is complete

@@ -108,77 +108,6 @@ def get_plugin_context() -> PluginContext:
     return PluginContext.get_instance()
 
 
-def on_outgoing_http_request(
-    uri: str,
-    method: str,
-    headers: Dict[str, str],
-    get_params: Dict[str, str],
-    body: bytes,
-) -> Optional[Dict[str, Any]]:
-    """
-    Orthanc HTTP filter callback - injects OAuth2 bearer tokens.
-
-    This function is called by Orthanc before each outgoing HTTP request.
-    We check if the request is to a configured DICOMweb server and inject
-    the Authorization header with a valid bearer token.
-
-    Args:
-        uri: Request URI
-        method: HTTP method (GET, POST, etc.)
-        headers: Request headers (mutable)
-        get_params: Query parameters
-        body: Request body
-
-    Returns:
-        Modified request dict or None to allow request
-    """
-    context = get_plugin_context()
-
-    # Find which server this request is for
-    server_name = context.find_server_for_url(uri)
-
-    if server_name is None:
-        # Not a configured OAuth server, let it pass through
-        return None
-
-    logger.debug(f"Injecting OAuth token for server '{server_name}'")
-
-    try:
-        # Get valid token
-        token_manager = context.get_token_manager(server_name)
-        if token_manager is None:
-            logger.error(f"No token manager for server '{server_name}'")
-            return None
-
-        token = token_manager.get_token()
-
-        # Inject Authorization header
-        headers["Authorization"] = f"Bearer {token}"
-
-        # Return modified request
-        return {
-            "headers": headers,
-            "method": method,
-            "uri": uri,
-            "get_params": get_params,
-            "body": body,
-        }
-
-    except TokenAcquisitionError as e:
-        logger.error(f"Failed to acquire token for '{server_name}': {e}")
-        # Return error response
-        return {
-            "status": 503,
-            "body": json.dumps(
-                {
-                    "error": "OAuth token acquisition failed",
-                    "server": server_name,
-                    "details": str(e),
-                }
-            ),
-        }
-
-
 def create_api_response(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Create standardized API response with version information.
@@ -285,7 +214,7 @@ def handle_rest_api_stow(output: Any, uri: str, **request: Any) -> None:
     POST /dicomweb-oauth/servers/{name}/stow
 
     Proxy STOW-RS requests with automatic OAuth token injection.
-    Workaround for lack of RegisterOnOutgoingHttpRequestFilter in Orthanc SDK.
+    Acts as a transparent proxy between DICOMweb plugin and remote DICOM server.
 
     Request body: Same as Orthanc's native STOW-RS endpoint
     {
@@ -699,17 +628,6 @@ if _ORTHANC_AVAILABLE and orthanc is not None:
         logger.info("Registering DICOMweb OAuth plugin with Orthanc")
         initialize_plugin()
         print("DEBUG: Plugin initialized successfully", flush=True)
-
-        # Register HTTP request filter only if available (Orthanc SDK >= 1.12.1)
-        if hasattr(orthanc, "RegisterOnOutgoingHttpRequestFilter"):
-            logger.info("Registering outgoing HTTP request filter")
-            orthanc.RegisterOnOutgoingHttpRequestFilter(on_outgoing_http_request)
-        else:
-            logger.warning(
-                "RegisterOnOutgoingHttpRequestFilter not available - "
-                "automatic OAuth token injection will not work. "
-                "Please upgrade to Orthanc SDK >= 1.12.1"
-            )
 
         # Register REST API endpoints
         print("DEBUG: About to register REST API endpoints", flush=True)
