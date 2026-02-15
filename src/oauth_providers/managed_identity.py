@@ -94,11 +94,11 @@ class AzureManagedIdentityProvider(OAuthProvider):
                     expires_in=expires_in,
                     token_type="Bearer",  # nosec B106
                 )
-            else:
-                raise TokenAcquisitionError(
-                    error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
-                    message="Managed identity returned empty token",
-                )
+
+            raise TokenAcquisitionError(
+                error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
+                message="Managed identity returned empty token",
+            )
 
         except ClientAuthenticationError as e:
             structured_logger.error(
