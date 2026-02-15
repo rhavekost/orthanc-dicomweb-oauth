@@ -1,6 +1,11 @@
 """Azure Managed Identity OAuth provider."""
+import time
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
+from azure.core.exceptions import ClientAuthenticationError
+from azure.identity import DefaultAzureCredential
+
+from src.error_codes import ErrorCode, TokenAcquisitionError
 from src.oauth_providers.base import OAuthConfig, OAuthProvider, OAuthToken
 from src.structured_logger import structured_logger
 
@@ -41,6 +46,7 @@ class AzureManagedIdentityProvider(OAuthProvider):
         # Store for convenient access
         self.scope = self.config.scope
         self.verify_ssl = self.config.verify_ssl
+        self._credential: Optional[DefaultAzureCredential] = None
 
         structured_logger.info(
             "AzureManagedIdentityProvider initialized", scope=self.scope
@@ -51,9 +57,66 @@ class AzureManagedIdentityProvider(OAuthProvider):
         """Return provider name."""
         return "azure_managed_identity"
 
+    @property
+    def credential(self) -> DefaultAzureCredential:
+        """Lazy-load DefaultAzureCredential."""
+        if self._credential is None:
+            self._credential = DefaultAzureCredential()
+        return self._credential
+
     def acquire_token(self) -> OAuthToken:
-        """Acquire OAuth token - to be implemented in Task 3."""
-        raise NotImplementedError("acquire_token not yet implemented")
+        """
+        Acquire OAuth token using managed identity.
+
+        Returns:
+            OAuthToken with access token and expiry
+
+        Raises:
+            TokenAcquisitionError: If token acquisition fails
+        """
+        try:
+            structured_logger.debug(
+                "Acquiring token via managed identity", scope=self.scope
+            )
+
+            token = self.credential.get_token(self.scope)
+
+            if token and token.token:
+                structured_logger.info(
+                    "Token acquired successfully via managed identity"
+                )
+                # Azure SDK returns AccessToken with token and expires_on
+                # Calculate expires_in from expires_on timestamp
+                expires_in = max(0, int(token.expires_on - time.time()))
+
+                return OAuthToken(
+                    access_token=token.token,
+                    expires_in=expires_in,
+                    token_type="Bearer",  # nosec B106
+                )
+            else:
+                raise TokenAcquisitionError(
+                    error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
+                    message="Managed identity returned empty token",
+                )
+
+        except ClientAuthenticationError as e:
+            structured_logger.error(
+                "Managed identity authentication failed", error=str(e)
+            )
+            raise TokenAcquisitionError(
+                error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
+                message=f"Managed identity authentication failed: {e}",
+            ) from e
+        except TokenAcquisitionError:
+            # Re-raise our own errors
+            raise
+        except Exception as e:
+            structured_logger.error("Unexpected error acquiring token", error=str(e))
+            raise TokenAcquisitionError(
+                error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
+                message=f"Token acquisition error: {e}",
+            ) from e
 
     def refresh_token(self, refresh_token: str) -> OAuthToken:
         """
