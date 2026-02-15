@@ -24,9 +24,9 @@ try:
     _FLASK_AVAILABLE = True
 except ImportError:
     _FLASK_AVAILABLE = False
-    Flask = None
-    jsonify = None
-    request = None
+    Flask = None  # type: ignore[assignment]
+    jsonify = None  # type: ignore[assignment]
+    request = None  # type: ignore[assignment]
 
 from src.config_parser import ConfigError, ConfigParser
 from src.metrics import get_metrics_text
@@ -598,7 +598,7 @@ def create_flask_app(
     app = Flask(__name__)
 
     # Initialize rate limiter
-    app.rate_limiter = RateLimiter(
+    app.rate_limiter = RateLimiter(  # type: ignore[attr-defined]
         max_requests=rate_limit_requests, window_seconds=rate_limit_window
     )
 
@@ -630,7 +630,7 @@ def create_flask_app(
         client_key = request.remote_addr or "unknown"
 
         try:
-            app.rate_limiter.check_rate_limit(client_key)
+            app.rate_limiter.check_rate_limit(client_key)  # type: ignore[attr-defined]
         except RateLimitExceeded as e:
             # Log security event
             structured_logger.security_event(
