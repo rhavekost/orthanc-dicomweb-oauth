@@ -6,6 +6,7 @@ from src.oauth_providers.azure import AzureOAuthProvider
 from src.oauth_providers.base import OAuthConfig, OAuthProvider
 from src.oauth_providers.generic import GenericOAuth2Provider
 from src.oauth_providers.google import GoogleProvider
+from src.oauth_providers.managed_identity import AzureManagedIdentityProvider
 
 
 class OAuthProviderFactory:
@@ -21,6 +22,7 @@ class OAuthProviderFactory:
         "azure": AzureOAuthProvider,
         "google": GoogleProvider,
         "aws": AWSProvider,
+        "azuremanagedidentity": AzureManagedIdentityProvider,
         # Add more providers here as implemented:
         # "keycloak": KeycloakOAuthProvider,
     }
@@ -46,7 +48,14 @@ class OAuthProviderFactory:
                 f"Supported: {list(cls._providers.keys())}"
             )
 
-        # Convert dict config to OAuthConfig
+        # Provider-specific initialization
+        provider_class = cls._providers[provider_type]
+
+        # Managed identity uses raw config dict, not OAuthConfig
+        if provider_type == "azuremanagedidentity":
+            return provider_class(config)  # type: ignore[arg-type]
+
+        # Convert dict config to OAuthConfig for other providers
         oauth_config = OAuthConfig(
             token_endpoint=config["TokenEndpoint"],
             client_id=config["ClientId"],
@@ -54,9 +63,6 @@ class OAuthProviderFactory:
             scope=config.get("Scope", ""),
             verify_ssl=config.get("VerifySSL", True),
         )
-
-        # Provider-specific initialization
-        provider_class = cls._providers[provider_type]
 
         if provider_type == "azure":
             tenant_id = config.get("TenantId", "common")

@@ -487,3 +487,18 @@ def test_generic_provider_acquire_token_with_default_values() -> None:
     assert token.token_type == "Bearer"  # Default
     assert token.refresh_token is None
     assert token.scope is None
+
+
+def test_provider_factory_managed_identity() -> None:
+    """Test factory creates managed identity provider."""
+    from src.oauth_providers.managed_identity import AzureManagedIdentityProvider
+
+    config = {
+        "Type": "AzureManagedIdentity",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
+    }
+
+    provider = OAuthProviderFactory.create("azuremanagedidentity", config)
+
+    assert isinstance(provider, AzureManagedIdentityProvider)
+    assert provider.scope == "https://dicom.healthcareapis.azure.com/.default"
