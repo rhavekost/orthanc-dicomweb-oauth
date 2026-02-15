@@ -1,12 +1,13 @@
 // ========================================
 // Private DNS Zones Module
 // ========================================
+// Creates and links Private DNS zones to VNet
 
-@description('Virtual Network ID to link DNS zones to')
+@description('The location for the resources')
+param location string
+
+@description('The ID of the VNet to link DNS zones to')
 param vnetId string
-
-@description('Virtual Network name for link naming')
-param vnetName string
 
 @description('Resource tags')
 param tags object = {}
@@ -15,16 +16,20 @@ param tags object = {}
 // Private DNS Zones
 // ========================================
 
-// Private DNS Zone for PostgreSQL
 resource postgresDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   name: 'privatelink.postgres.database.azure.com'
   location: 'global'
   tags: tags
 }
 
-// Private DNS Zone for Blob Storage
 resource blobDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: 'privatelink.blob.${environment().suffixes.storage}'
+  name: 'privatelink.blob.core.windows.net'
+  location: 'global'
+  tags: tags
+}
+
+resource acrDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.azurecr.io'
   location: 'global'
   tags: tags
 }
@@ -33,10 +38,9 @@ resource blobDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
 // VNet Links
 // ========================================
 
-// Link PostgreSQL DNS zone to VNet
 resource postgresVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
   parent: postgresDnsZone
-  name: '${vnetName}-postgres-link'
+  name: 'postgres-vnet-link'
   location: 'global'
   tags: tags
   properties: {
@@ -47,10 +51,22 @@ resource postgresVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks
   }
 }
 
-// Link Blob DNS zone to VNet
 resource blobVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
   parent: blobDnsZone
-  name: '${vnetName}-blob-link'
+  name: 'blob-vnet-link'
+  location: 'global'
+  tags: tags
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnetId
+    }
+  }
+}
+
+resource acrVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: acrDnsZone
+  name: 'acr-vnet-link'
   location: 'global'
   tags: tags
   properties: {
@@ -67,5 +83,4 @@ resource blobVnetLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@202
 
 output postgresDnsZoneId string = postgresDnsZone.id
 output blobDnsZoneId string = blobDnsZone.id
-output postgresDnsZoneName string = postgresDnsZone.name
-output blobDnsZoneName string = blobDnsZone.name
+output acrDnsZoneId string = acrDnsZone.id
