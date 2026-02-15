@@ -26,9 +26,29 @@ ENV_NAME="${ENV_NAME:-production}"
 LOCATION="${LOCATION:-westus2}"
 RG_NAME="rg-orthanc-oauth-${ENV_NAME}"
 
-# Generate secure random passwords
-ORTHANC_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
-POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+# Get the directory where this script is located (needed for credential storage)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load existing credentials if available (idempotent deployment)
+DETAILS_FILE="$SCRIPT_DIR/deployment-details.json"
+if [ -f "$DETAILS_FILE" ]; then
+  echo "Found existing deployment - reusing credentials"
+  ORTHANC_PASSWORD=$(jq -r '.orthancPassword' "$DETAILS_FILE")
+  POSTGRES_PASSWORD=$(jq -r '.postgresPassword' "$DETAILS_FILE")
+else
+  echo "Generating new credentials"
+  ORTHANC_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+  POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+
+  # Save for future runs
+  jq -n \
+    --arg op "$ORTHANC_PASSWORD" \
+    --arg pp "$POSTGRES_PASSWORD" \
+    '{orthancPassword: $op, postgresPassword: $pp}' \
+    > "$DETAILS_FILE"
+
+  echo "Credentials saved to $DETAILS_FILE"
+fi
 
 # Fixed usernames
 ORTHANC_USERNAME="orthanc"
@@ -50,23 +70,36 @@ echo ""
 echo "Phase 2: Deploy Network Infrastructure"
 echo "----------------------------------------"
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Deploy using subscription-level deployment
+# Deploy using subscription-level deployment with secure parameter file
 echo "Starting Azure deployment..."
+DEPLOYMENT_NAME="orthanc-oauth-${ENV_NAME}-$(date +%Y%m%d-%H%M%S)"
+
+# Create temporary parameter file to avoid password exposure in process list
+PARAM_FILE=$(mktemp)
+trap 'rm -f "$PARAM_FILE"' EXIT
+
+cat > "$PARAM_FILE" <<EOF
+{
+  "\$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {"value": "$ENV_NAME"},
+    "location": {"value": "$LOCATION"},
+    "resourceGroupName": {"value": "$RG_NAME"},
+    "orthancUsername": {"value": "$ORTHANC_USERNAME"},
+    "orthancPassword": {"value": "$ORTHANC_PASSWORD"},
+    "postgresAdminUsername": {"value": "$POSTGRES_USERNAME"},
+    "postgresAdminPassword": {"value": "$POSTGRES_PASSWORD"}
+  }
+}
+EOF
+
 az deployment sub create \
-  --name "orthanc-oauth-${ENV_NAME}-$(date +%Y%m%d-%H%M%S)" \
+  --name "$DEPLOYMENT_NAME" \
   --location "$LOCATION" \
   --template-file "$SCRIPT_DIR/main.bicep" \
-  --parameters environmentName="$ENV_NAME" \
-  --parameters location="$LOCATION" \
-  --parameters resourceGroupName="$RG_NAME" \
-  --parameters orthancUsername="$ORTHANC_USERNAME" \
-  --parameters orthancPassword="$ORTHANC_PASSWORD" \
-  --parameters postgresAdminUsername="$POSTGRES_USERNAME" \
-  --parameters postgresAdminPassword="$POSTGRES_PASSWORD" \
-  --output json > "$SCRIPT_DIR/deployment-output.json"
+  --parameters "@$PARAM_FILE" \
+  -o json > "$SCRIPT_DIR/deployment-output.json"
 
 # Check deployment status
 if [ $? -ne 0 ]; then
@@ -83,30 +116,32 @@ echo ""
 echo "Phase 3: Extract Deployment Details"
 echo "----------------------------------------"
 
-# Extract outputs using jq
+# Extract all critical outputs using jq
 ACR_NAME=$(jq -r '.properties.outputs.containerRegistryName.value' "$SCRIPT_DIR/deployment-output.json")
 ACR_LOGIN_SERVER=$(jq -r '.properties.outputs.containerRegistryLoginServer.value' "$SCRIPT_DIR/deployment-output.json")
 CONTAINER_APP_URL=$(jq -r '.properties.outputs.containerAppUrl.value' "$SCRIPT_DIR/deployment-output.json")
+DICOM_URL=$(jq -r '.properties.outputs.dicomServiceUrl.value' "$SCRIPT_DIR/deployment-output.json")
+POSTGRES_FQDN=$(jq -r '.properties.outputs.postgresServerFqdn.value' "$SCRIPT_DIR/deployment-output.json")
+STORAGE_NAME=$(jq -r '.properties.outputs.storageAccountName.value' "$SCRIPT_DIR/deployment-output.json")
+RESOURCE_GROUP=$(jq -r '.properties.outputs.resourceGroupName.value' "$SCRIPT_DIR/deployment-output.json")
+VNET_ID=$(jq -r '.properties.outputs.vnetId.value' "$SCRIPT_DIR/deployment-output.json")
 
-# Validate extracted values
-if [ -z "$ACR_NAME" ] || [ "$ACR_NAME" = "null" ]; then
-  echo "ERROR: Failed to extract Container Registry name from deployment output"
-  exit 1
-fi
-
-if [ -z "$ACR_LOGIN_SERVER" ] || [ "$ACR_LOGIN_SERVER" = "null" ]; then
-  echo "ERROR: Failed to extract Container Registry login server from deployment output"
-  exit 1
-fi
-
-if [ -z "$CONTAINER_APP_URL" ] || [ "$CONTAINER_APP_URL" = "null" ]; then
-  echo "ERROR: Failed to extract Container App URL from deployment output"
-  exit 1
-fi
+# Validate all critical outputs
+for var in ACR_NAME ACR_LOGIN_SERVER CONTAINER_APP_URL DICOM_URL; do
+  eval value=\$$var
+  if [ -z "$value" ] || [ "$value" = "null" ]; then
+    echo "ERROR: Failed to extract $var from deployment output"
+    exit 1
+  fi
+done
 
 echo "Container Registry Name: $ACR_NAME"
 echo "Container Registry Server: $ACR_LOGIN_SERVER"
 echo "Container App URL: $CONTAINER_APP_URL"
+echo "DICOM Service URL: $DICOM_URL"
+echo "PostgreSQL Server FQDN: $POSTGRES_FQDN"
+echo "Storage Account Name: $STORAGE_NAME"
+echo "Resource Group: $RESOURCE_GROUP"
 echo ""
 
 #############################################
