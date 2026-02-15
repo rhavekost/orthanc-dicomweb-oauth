@@ -7,8 +7,12 @@ DICOMweb endpoint.
 """
 import json
 import logging
-from datetime import datetime
+import re
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+
+import requests
 
 try:
     import orthanc
@@ -82,7 +86,7 @@ def initialize_plugin(
 
         # Initialize token manager for each configured server
         for server_name, server_config in servers.items():
-            logger.info(f"Configuring OAuth for server: {server_name}")
+            logger.info("Configuring OAuth for server: %s", server_name)
 
             manager = TokenManager(server_name, server_config)
             context.register_token_manager(
@@ -90,16 +94,18 @@ def initialize_plugin(
             )
 
             logger.info(
-                f"Server '{server_name}' configured with URL: {server_config['Url']}"
+                "Server '%s' configured with URL: %s",
+                server_name,
+                server_config["Url"],
             )
 
-        logger.info(f"DICOMweb OAuth plugin initialized with {len(servers)} server(s)")
+        logger.info("DICOMweb OAuth plugin initialized with %d server(s)", len(servers))
 
-    except ConfigError as e:
-        logger.error(f"Configuration error: {e}")
+    except ConfigError as config_err:
+        logger.error("Configuration error: %s", config_err)
         raise
-    except Exception as e:
-        logger.error(f"Failed to initialize plugin: {e}")
+    except Exception as init_err:
+        logger.error("Failed to initialize plugin: %s", init_err)
         raise
 
 
@@ -118,8 +124,6 @@ def create_api_response(data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Response dictionary with version headers and data
     """
-    from datetime import timezone
-
     return {
         "plugin_version": PLUGIN_VERSION,
         "api_version": API_VERSION,
@@ -128,7 +132,7 @@ def create_api_response(data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def handle_rest_api_status(output: Any, uri: str, **_request: Any) -> None:
+def handle_rest_api_status(output: Any, _uri: str, **_request: Any) -> None:
     """
     REST API endpoint: Plugin status check.
 
@@ -160,13 +164,17 @@ def handle_rest_api_status(output: Any, uri: str, **_request: Any) -> None:
         response = create_api_response(data)
         output.AnswerBuffer(json.dumps(response, indent=2), "application/json")
 
-    except Exception as e:
-        logger.error(f"Status endpoint failed: {type(e).__name__}: {e}")
-        error_response = create_api_response({"status": "error", "error": str(e)})
+    except Exception as status_err:
+        logger.error(
+            "Status endpoint failed: %s: %s", type(status_err).__name__, status_err
+        )
+        error_response = create_api_response(
+            {"status": "error", "error": str(status_err)}
+        )
         output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
-def handle_rest_api_servers(output: Any, uri: str, **_request: Any) -> None:
+def handle_rest_api_servers(output: Any, _uri: str, **_request: Any) -> None:
     """
     REST API endpoint: List configured servers.
 
@@ -203,9 +211,13 @@ def handle_rest_api_servers(output: Any, uri: str, **_request: Any) -> None:
         response = create_api_response({"servers": servers})
         output.AnswerBuffer(json.dumps(response, indent=2), "application/json")
 
-    except Exception as e:
-        logger.error(f"Servers endpoint failed: {type(e).__name__}: {e}")
-        error_response = create_api_response({"error": str(e)})
+    except Exception as servers_err:
+        logger.error(
+            "Servers endpoint failed: %s: %s",
+            type(servers_err).__name__,
+            servers_err,
+        )
+        error_response = create_api_response({"error": str(servers_err)})
         output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
@@ -225,14 +237,14 @@ def _extract_server_name(uri: str) -> tuple[str | None, str | None]:
 
 
 def _build_multipart_from_resources(
-    resources: list[str], boundary: str, orthanc: Any
+    resources: list[str], boundary: str, orthanc_module: Any
 ) -> tuple[bytes | None, str | None]:
     """Build multipart DICOM message from resource IDs.
 
     Args:
         resources: List of Orthanc resource IDs
         boundary: MIME boundary string
-        orthanc: Orthanc module
+        orthanc_module: Orthanc module
 
     Returns:
         Tuple of (multipart_body, error_message). If successful, error is None.
@@ -240,15 +252,15 @@ def _build_multipart_from_resources(
     multipart_data = []
     for resource_id in resources:
         try:
-            dicom_data = orthanc.RestApiGet(f"/instances/{resource_id}/file")
+            dicom_data = orthanc_module.RestApiGet(f"/instances/{resource_id}/file")
             part_header = f"--{boundary}\r\n"
             part_header += "Content-Type: application/dicom\r\n\r\n"
             multipart_data.append(part_header.encode("utf-8"))
             multipart_data.append(dicom_data)
             multipart_data.append(b"\r\n")
-        except Exception as e:
-            logger.error(f"Failed to get DICOM file for {resource_id}: {e}")
-            return None, f"Failed to get DICOM file: {str(e)}"
+        except Exception as dicom_err:
+            logger.error("Failed to get DICOM file for %s: %s", resource_id, dicom_err)
+            return None, f"Failed to get DICOM file: {str(dicom_err)}"
 
     multipart_data.append(f"--{boundary}--\r\n".encode("utf-8"))
     return b"".join(multipart_data), None
@@ -297,70 +309,69 @@ def _get_oauth_token(context: Any, server_name: str, output: Any) -> str | None:
     try:
         token = token_manager.get_token()
         return str(token) if token else None
-    except TokenAcquisitionError as e:
-        logger.error(f"Failed to acquire token for '{server_name}': {e}")
-        output.AnswerBuffer(
-            json.dumps({"error": "OAuth token acquisition failed", "details": str(e)}),
-            "application/json",
-        )
+    except TokenAcquisitionError as token_err:
+        logger.error("Failed to acquire token for '%s': %s", server_name, token_err)
+        error_data = {
+            "error": "OAuth token acquisition failed",
+            "details": str(token_err),
+        }
+        output.AnswerBuffer(json.dumps(error_data), "application/json")
         return None
 
 
 def _prepare_request_body_and_headers(
-    content_type: str, body: bytes, orthanc: Any
+    content_type: str, body: bytes, orthanc_module: Any
 ) -> tuple[bytes | None, dict[str, str] | None, str | None]:
     """Prepare request body and headers based on content type.
 
     Args:
         content_type: Request content type
         body: Request body as bytes
-        orthanc: Orthanc module
+        orthanc_module: Orthanc module
 
     Returns:
         Tuple of (body, headers_dict, error_message). If successful, error is None.
     """
     if "multipart/related" in content_type:
         # DICOMweb plugin is sending pre-formatted multipart DICOM data
-        logger.info(f"Forwarding multipart DICOM data ({len(body)} bytes)")
+        logger.info("Forwarding multipart DICOM data (%d bytes)", len(body))
         extra_headers = {
             "Content-Type": content_type,
             "Accept": "application/dicom+json",
         }
         return body, extra_headers, None
-    else:
-        # JSON request with resource IDs - build multipart ourselves
-        return _prepare_json_request(body, orthanc)
+
+    # JSON request with resource IDs - build multipart ourselves
+    return _prepare_json_request(body, orthanc_module)
 
 
 def _prepare_json_request(
-    body: bytes, orthanc: Any
+    body: bytes, orthanc_module: Any
 ) -> tuple[bytes | None, dict[str, str] | None, str | None]:
     """Prepare DICOM data from JSON request with resource IDs.
 
     Args:
         body: Request body as bytes
-        orthanc: Orthanc module
+        orthanc_module: Orthanc module
 
     Returns:
         Tuple of (body, headers_dict, error_message). If successful, error is None.
     """
-    import uuid
-
     try:
         body_str = body.decode("utf-8") if isinstance(body, bytes) else body
         request_data = json.loads(body_str) if body_str else {}
         resources = request_data.get("Resources", [])
-    except (UnicodeDecodeError, json.JSONDecodeError) as e:
-        return None, None, f"Invalid request body: {type(e).__name__}"
+    except (UnicodeDecodeError, json.JSONDecodeError) as decode_err:
+        return None, None, f"Invalid request body: {type(decode_err).__name__}"
 
     if not resources:
         return None, None, "No resources specified"
 
-    logger.info(f"Building multipart from {len(resources)} resources")
+    logger.info("Building multipart from %d resources", len(resources))
 
     boundary = uuid.uuid4().hex
     multipart_body, error = _build_multipart_from_resources(
-        resources, boundary, orthanc
+        resources, boundary, orthanc_module
     )
     if error:
         return None, None, error
@@ -381,8 +392,6 @@ def _send_dicom_to_server(
         headers: HTTP headers including OAuth token
         output: Orthanc output object for response
     """
-    import requests
-
     try:
         response = requests.post(stow_url, data=body, headers=headers, timeout=300)
         response.raise_for_status()
@@ -390,10 +399,11 @@ def _send_dicom_to_server(
         # Log Azure's response for debugging
         content_type_header = response.headers.get("Content-Type")
         logger.info(
-            f"Azure response status: {response.status_code}, "
-            f"Content-Type: {content_type_header}"
+            "Azure response status: %d, Content-Type: %s",
+            response.status_code,
+            content_type_header,
         )
-        logger.info(f"Azure response length: {len(response.content)} bytes")
+        logger.info("Azure response length: %d bytes", len(response.content))
 
         # Return Azure's response (use .content for binary-safe handling)
         output.AnswerBuffer(
@@ -402,29 +412,31 @@ def _send_dicom_to_server(
         )
         logger.info("Successfully sent DICOM data to remote server")
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to send to remote DICOM server: {e}")
+    except requests.exceptions.RequestException as req_err:
+        logger.error("Failed to send to remote DICOM server: %s", req_err)
         error_details = {
             "error": "Failed to send to remote DICOM server",
-            "details": str(e),
-            "status_code": getattr(e.response, "status_code", None)
-            if hasattr(e, "response")
+            "details": str(req_err),
+            "status_code": getattr(req_err.response, "status_code", None)
+            if hasattr(req_err, "response")
             else None,
-            "response_text": e.response.text
-            if hasattr(e, "response") and e.response
+            "response_text": req_err.response.text
+            if hasattr(req_err, "response") and req_err.response
             else None,
         }
         output.AnswerBuffer(json.dumps(error_details), "application/json")
 
 
-def _process_stow_request(output: Any, uri: str, request: Any, orthanc: Any) -> None:
+def _process_stow_request(
+    output: Any, uri: str, req_data: Any, orthanc_module: Any
+) -> None:
     """Process STOW-RS request with OAuth.
 
     Args:
         output: Orthanc output object
         uri: Request URI
-        request: Request data
-        orthanc: Orthanc module
+        req_data: Request data
+        orthanc_module: Orthanc module
     """
     context = get_plugin_context()
 
@@ -447,11 +459,11 @@ def _process_stow_request(output: Any, uri: str, request: Any, orthanc: Any) -> 
         return  # Error already sent to output
 
     # Prepare request body and headers based on content type
-    content_type = request.get("headers", {}).get("content-type", "")
-    request_body = request.get("body", b"")
+    content_type = req_data.get("headers", {}).get("content-type", "")
+    request_body = req_data.get("body", b"")
 
     body, extra_headers, error = _prepare_request_body_and_headers(
-        content_type, request_body, orthanc
+        content_type, request_body, orthanc_module
     )
     if error or body is None or extra_headers is None:
         output.AnswerBuffer(
@@ -467,7 +479,7 @@ def _process_stow_request(output: Any, uri: str, request: Any, orthanc: Any) -> 
     _send_dicom_to_server(stow_url, body, headers, output)
 
 
-def handle_rest_api_stow(output: Any, uri: str, **request: Any) -> None:
+def handle_rest_api_stow(output: Any, uri: str, **req_data: Any) -> None:
     """Proxy STOW-RS requests with automatic OAuth token injection.
 
     POST /dicomweb-oauth/servers/{name}/stow
@@ -482,20 +494,26 @@ def handle_rest_api_stow(output: Any, uri: str, **request: Any) -> None:
     }
     """
     print(f"DEBUG: handle_rest_api_stow CALLED! URI: {uri}", flush=True)
-    import orthanc
+    # Import orthanc locally to avoid import errors during testing
+    import orthanc  # pylint: disable=import-error
 
     try:
         print("DEBUG: Got plugin context", flush=True)
-        print(f"DEBUG: Request headers: {request.get('headers', {})}", flush=True)
-        body_len = len(request.get("body", b"")) if request.get("body") else 0
+        print(f"DEBUG: Request headers: {req_data.get('headers', {})}", flush=True)
+        body_len = len(req_data.get("body", b"")) if req_data.get("body") else 0
         print(f"DEBUG: Request body length: {body_len}", flush=True)
 
         # Process the STOW request with OAuth
-        _process_stow_request(output, uri, request, orthanc)
+        _process_stow_request(output, uri, req_data, orthanc)
 
-    except Exception as e:
-        logger.error(f"STOW-RS proxy failed: {type(e).__name__}: {e}", exc_info=True)
-        error_response = {"error": str(e), "type": type(e).__name__}
+    except Exception as stow_err:
+        logger.error(
+            "STOW-RS proxy failed: %s: %s",
+            type(stow_err).__name__,
+            stow_err,
+            exc_info=True,
+        )
+        error_response = {"error": str(stow_err), "type": type(stow_err).__name__}
         output.AnswerBuffer(json.dumps(error_response), "application/json")
 
 
@@ -548,14 +566,14 @@ def handle_rest_api_test_server(output: Any, uri: str, **_request: Any) -> None:
 
         output.AnswerBuffer(json.dumps(result, indent=2), "application/json")
 
-    except TokenAcquisitionError as e:
-        result = {"server": server_name, "status": "error", "error": str(e)}
+    except TokenAcquisitionError as test_err:
+        result = {"server": server_name, "status": "error", "error": str(test_err)}
         output.AnswerBuffer(
             json.dumps(result, indent=2), "application/json", status=503
         )
 
 
-def metrics_endpoint(output: Any, uri: str, **_request: Any) -> None:
+def metrics_endpoint(output: Any, _uri: str, **_request: Any) -> None:
     """
     REST API endpoint: Prometheus metrics.
 
@@ -569,9 +587,9 @@ def metrics_endpoint(output: Any, uri: str, **_request: Any) -> None:
     try:
         metrics_text = get_metrics_text()
         output.AnswerBuffer(metrics_text, "text/plain; version=0.0.4")
-    except Exception as e:
-        logger.error(f"Failed to generate metrics: {e}")
-        error_message = f"Error generating metrics: {e}"
+    except Exception as metrics_err:
+        logger.error("Failed to generate metrics: %s", metrics_err)
+        error_message = f"Error generating metrics: {metrics_err}"
         output.AnswerBuffer(error_message, "text/plain", status=500)
 
 
@@ -668,8 +686,10 @@ def create_flask_app(
             }
             response = create_api_response(data)
             return jsonify(response)
-        except Exception as e:
-            error_response = create_api_response({"status": "error", "error": str(e)})
+        except Exception as flask_err:
+            error_response = create_api_response(
+                {"status": "error", "error": str(flask_err)}
+            )
             return jsonify(error_response)
 
     @app.route("/dicomweb-oauth/servers/<name>/test", methods=["POST"])
@@ -697,21 +717,20 @@ def create_flask_app(
 
             return jsonify(result)
 
-        except TokenAcquisitionError as e:
-            result = {"server": name, "status": "error", "error": str(e)}
+        except TokenAcquisitionError as flask_token_err:
+            result = {"server": name, "status": "error", "error": str(flask_token_err)}
             return jsonify(result), 503
 
     return app
 
 
 # Orthanc plugin entry point
-def OnChange(_changeType: int, level: int, _resource: str) -> None:
+def OnChange(_changeType: int, _level: int, _resource: str) -> None:
     """Orthanc change callback (not used, but required by plugin API)."""
-    pass
 
 
 def OnIncomingHttpRequest(
-    method: str, uri: str, _ip: str, _username: str, headers: Dict[str, str]
+    method: str, uri: str, _ip: str, _username: str, _headers: Dict[str, str]
 ) -> int:
     """
     Orthanc incoming HTTP request callback - intercept STOW requests.
@@ -721,12 +740,9 @@ def OnIncomingHttpRequest(
         1 to deny the request
     """
     # Check if this is a STOW request to a configured server
-    import re
-
     if method == "POST" and re.match(r"/dicom-web/servers/.+/stow", uri):
         print(f"DEBUG: Intercepted STOW request to {uri}", flush=True)
         # For now, just log it and allow it to proceed
-        # TODO: Actually handle the request with OAuth
     return 0  # Allow request to proceed
 
 
@@ -751,7 +767,7 @@ if _ORTHANC_AVAILABLE and orthanc is not None:
         # OVERRIDE DICOMweb plugin's STOW endpoint to inject OAuth transparently
         # This intercepts /dicom-web/servers/{name}/stow and adds OAuth automatically
         # Test endpoint to verify registration works
-        def test_handler(output: Any, uri: str, **request: Any) -> None:
+        def test_handler(output: Any, uri: str, **_request: Any) -> None:
             """Test handler to verify REST endpoint registration."""
             print(f"DEBUG: TEST HANDLER CALLED! URI: {uri}", flush=True)
             output.AnswerBuffer(
@@ -804,6 +820,6 @@ if _ORTHANC_AVAILABLE and orthanc is not None:
             "http://localhost:8042/oauth-dicom-web/servers/{server-name} "
             "to enable transparent OAuth in Orthanc Explorer 2 UI"
         )
-    except Exception as e:
-        logger.error(f"Failed to register plugin: {e}")
+    except Exception as register_err:
+        logger.error("Failed to register plugin: %s", register_err)
         raise
