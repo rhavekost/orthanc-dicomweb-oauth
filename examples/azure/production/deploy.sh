@@ -16,6 +16,32 @@ echo "=========================================="
 echo ""
 
 #############################################
+# Prerequisites: Register Resource Providers
+#############################################
+echo "Prerequisites: Checking Resource Providers"
+echo "----------------------------------------"
+
+# Required resource providers for this deployment
+REQUIRED_PROVIDERS="Microsoft.App Microsoft.ContainerService Microsoft.HealthcareApis Microsoft.Network Microsoft.Storage Microsoft.ContainerRegistry Microsoft.DBforPostgreSQL"
+
+for PROVIDER in $REQUIRED_PROVIDERS; do
+  echo "Checking $PROVIDER..."
+  # Check registration status
+  STATUS=$(az provider show --namespace "$PROVIDER" --query "registrationState" -o tsv 2>/dev/null || echo "NotFound")
+
+  if [ "$STATUS" != "Registered" ]; then
+    echo "  Registering $PROVIDER (this may take a few minutes)..."
+    az provider register --namespace "$PROVIDER" --wait
+    echo "  ✓ $PROVIDER registered"
+  else
+    echo "  ✓ $PROVIDER already registered"
+  fi
+done
+
+echo "All required resource providers are registered"
+echo ""
+
+#############################################
 # Phase 1: Configuration
 #############################################
 echo "Phase 1: Configuration"
