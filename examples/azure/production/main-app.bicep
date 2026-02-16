@@ -46,8 +46,9 @@ param containerRegistryId string
 @description('Container Apps subnet ID')
 param containerAppsSubnetId string
 
-@description('Storage account name')
-param storageAccountName string
+@description('Storage connection string')
+@secure()
+param storageConnectionString string
 
 @description('Storage container name')
 param storageContainerName string
@@ -75,7 +76,7 @@ var resourcePrefix = 'orthanc-${environmentName}'
 var containerAppName = '${resourcePrefix}-app'
 var environmentNameContainerApps = '${resourcePrefix}-cae'
 var containerImage = '${containerRegistryLoginServer}/orthanc-oauth:latest'
-var postgresConnectionString = 'host=${postgresServerName}.postgres.database.azure.com port=5432 dbname=orthanc user=${postgresAdminUsername} password=${postgresAdminPassword} sslmode=require'
+var postgresHost = '${postgresServerName}.postgres.database.azure.com'
 
 // ========================================
 // Container App with Managed Identity
@@ -94,8 +95,10 @@ module containerApp './modules/container-app.bicep' = {
     containerAppsSubnetId: containerAppsSubnetId
     orthancUsername: orthancUsername
     orthancPassword: orthancPassword
-    postgresConnectionString: postgresConnectionString
-    storageAccountName: storageAccountName
+    postgresHost: postgresHost
+    postgresUsername: postgresAdminUsername
+    postgresPassword: postgresAdminPassword
+    storageConnectionString: storageConnectionString
     storageContainerName: storageContainerName
     dicomServiceUrl: dicomServiceUrl
     tags: tags

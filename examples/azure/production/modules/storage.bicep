@@ -97,3 +97,5 @@ output storageAccountId string = storageAccount.id
 output storageAccountName string = storageAccount.name
 output blobEndpoint string = storageAccount.properties.primaryEndpoints.blob
 output containerName string = orthancContainer.name
+#disable-next-line outputs-should-not-contain-secrets
+output storageConnectionString string = 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'

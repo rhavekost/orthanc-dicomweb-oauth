@@ -1,0 +1,111 @@
+{
+  "Name": "Orthanc OAuth Production",
+  "HttpPort": 8042,
+  "DicomPort": 4242,
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": true,
+  "RegisteredUsers": {
+    "${ORTHANC_USERNAME}": "${ORTHANC_PASSWORD}"
+  },
+  "PostgreSQL": {
+    "EnableIndex": true,
+    "EnableStorage": false,
+    "Lock": false,
+    "Host": "${POSTGRES_HOST}",
+    "Port": 5432,
+    "Database": "${POSTGRES_DATABASE}",
+    "Username": "${POSTGRES_USERNAME}",
+    "Password": "${POSTGRES_PASSWORD}",
+    "EnableSSL": true,
+    "MaximumConnectionRetries": 10,
+    "ConnectionRetryInterval": 5
+  },
+  "AzureBlobStorage": {
+    "ConnectionString": "${AZURE_STORAGE_CONNECTION_STRING}",
+    "ContainerName": "${AZURE_STORAGE_CONTAINER}",
+    "CreateContainerIfNotExists": true,
+    "EnableStorageEncryption": false,
+    "StorageStructure": "flat"
+  },
+  "OrthancExplorer2": {
+    "Enable": true,
+    "IsDefaultOrthancUI": true
+  },
+  "Plugins": ["/etc/orthanc/plugins"],
+  "PythonScript": "/etc/orthanc/plugins/src/dicomweb_oauth_plugin.py",
+  "PythonVerbose": true,
+  "DicomWeb": {
+    "Enable": true,
+    "Root": "/dicom-web/",
+    "EnableWado": true,
+    "EnableStow": true,
+    "EnableQido": true,
+    "WadoRoot": "/wado",
+    "Host": "0.0.0.0",
+    "PublicRoot": "/dicom-web/",
+    "Ssl": false,
+    "QidoCaseSensitive": false,
+    "StudiesMetadata": "MainDicomTags",
+    "SeriesMetadata": "MainDicomTags",
+    "Servers": {
+      "azure-dicom": {
+        "Url": "http://localhost:8042/oauth-dicom-web/servers/azure-dicom",
+        "Username": "${ORTHANC_USERNAME}",
+        "Password": "${ORTHANC_PASSWORD}",
+        "HasDelete": false,
+        "ChunkedTransfers": true
+      }
+    }
+  },
+  "DicomWebOAuth": {
+    "ConfigVersion": "2.0",
+    "LogLevel": "INFO",
+    "EnableMetrics": true,
+    "RateLimitRequests": 100,
+    "RateLimitWindowSeconds": 60,
+    "Servers": {
+      "azure-dicom": {
+        "Url": "${DICOM_SERVICE_URL}",
+        "Type": "AzureManagedIdentity",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
+        "VerifySSL": true
+      }
+    }
+  },
+  "DicomAet": "ORTHANC",
+  "DicomCheckCalledAet": false,
+  "DicomCheckModalityHost": false,
+  "DefaultEncoding": "Utf8",
+  "DicomAssociationCloseDelay": 5,
+  "DicomScuTimeout": 30,
+  "DicomScpTimeout": 30,
+  "DicomThreadsCount": 4,
+  "HttpServerEnabled": true,
+  "HttpDescribeErrors": true,
+  "HttpCompressionEnabled": true,
+  "HttpThreadsCount": 50,
+  "HttpRequestTimeout": 60,
+  "HttpTimeout": 300,
+  "HttpKeepAlive": true,
+  "KeepAlive": true,
+  "TcpNoDelay": true,
+  "NetworkTimeout": 60,
+  "JobsHistorySize": 100,
+  "SaveJobs": true,
+  "OverwriteInstances": false,
+  "StorageCompression": false,
+  "StoreDicom": true,
+  "StorageAccessOnFind": "Never",
+  "MaximumStorageSize": 0,
+  "MaximumPatientCount": 0,
+  "QueryRetrieveSize": 100,
+  "CaseSensitivePN": false,
+  "LimitFindResults": 0,
+  "LimitFindInstances": 0,
+  "MetricsEnabled": true,
+  "LogExportedResources": true,
+  "Verbosity": "default",
+  "LogLevel": "default",
+  "ExecuteLuaEnabled": true,
+  "HttpsVerifyPeers": true
+}

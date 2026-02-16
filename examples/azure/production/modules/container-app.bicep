@@ -24,12 +24,22 @@ param orthancUsername string
 @secure()
 param orthancPassword string
 
-@description('PostgreSQL connection string')
-@secure()
-param postgresConnectionString string
+@description('PostgreSQL server FQDN')
+param postgresHost string
 
-@description('Storage account name')
-param storageAccountName string
+@description('PostgreSQL database name')
+param postgresDatabase string = 'orthanc'
+
+@description('PostgreSQL admin username')
+param postgresUsername string
+
+@description('PostgreSQL admin password')
+@secure()
+param postgresPassword string
+
+@description('Azure Storage connection string')
+@secure()
+param storageConnectionString string
 
 @description('Storage container name')
 param storageContainerName string
@@ -104,8 +114,12 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           value: orthancPassword
         }
         {
-          name: 'postgres-connection-string'
-          value: postgresConnectionString
+          name: 'postgres-password'
+          value: postgresPassword
+        }
+        {
+          name: 'storage-connection-string'
+          value: storageConnectionString
         }
       ]
     }
@@ -128,12 +142,24 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
               secretRef: 'orthanc-password'
             }
             {
-              name: 'POSTGRES_CONNECTION_STRING'
-              secretRef: 'postgres-connection-string'
+              name: 'POSTGRES_HOST'
+              value: postgresHost
             }
             {
-              name: 'AZURE_STORAGE_ACCOUNT'
-              value: storageAccountName
+              name: 'POSTGRES_DATABASE'
+              value: postgresDatabase
+            }
+            {
+              name: 'POSTGRES_USERNAME'
+              value: postgresUsername
+            }
+            {
+              name: 'POSTGRES_PASSWORD'
+              secretRef: 'postgres-password'
+            }
+            {
+              name: 'AZURE_STORAGE_CONNECTION_STRING'
+              secretRef: 'storage-connection-string'
             }
             {
               name: 'AZURE_STORAGE_CONTAINER'
@@ -142,10 +168,6 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             {
               name: 'DICOM_SERVICE_URL'
               value: dicomServiceUrl
-            }
-            {
-              name: 'USE_MANAGED_IDENTITY'
-              value: 'true'
             }
           ]
         }

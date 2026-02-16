@@ -149,6 +149,7 @@ POSTGRES_NAME=$(jq -r '.properties.outputs.postgresServerName.value' "$SCRIPT_DI
 STORAGE_NAME=$(jq -r '.properties.outputs.storageAccountName.value' "$SCRIPT_DIR/infrastructure-output.json")
 STORAGE_ID=$(jq -r '.properties.outputs.storageAccountId.value' "$SCRIPT_DIR/infrastructure-output.json")
 STORAGE_CONTAINER=$(jq -r '.properties.outputs.storageContainerName.value' "$SCRIPT_DIR/infrastructure-output.json")
+STORAGE_CONNECTION_STRING=$(jq -r '.properties.outputs.storageConnectionString.value' "$SCRIPT_DIR/infrastructure-output.json")
 RESOURCE_GROUP=$(jq -r '.properties.outputs.resourceGroupName.value' "$SCRIPT_DIR/infrastructure-output.json")
 VNET_ID=$(jq -r '.properties.outputs.vnetId.value' "$SCRIPT_DIR/infrastructure-output.json")
 CONTAINER_APPS_SUBNET_ID=$(jq -r '.properties.outputs.containerAppsSubnetId.value' "$SCRIPT_DIR/infrastructure-output.json")
@@ -231,7 +232,7 @@ cat > "$APP_PARAM_FILE" <<EOF
     "containerRegistryAdminPassword": {"value": "$ACR_PASSWORD"},
     "containerRegistryId": {"value": "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"},
     "containerAppsSubnetId": {"value": "$CONTAINER_APPS_SUBNET_ID"},
-    "storageAccountName": {"value": "$STORAGE_NAME"},
+    "storageConnectionString": {"value": "$STORAGE_CONNECTION_STRING"},
     "storageContainerName": {"value": "$STORAGE_CONTAINER"},
     "storageAccountId": {"value": "$STORAGE_ID"},
     "dicomServiceUrl": {"value": "$DICOM_URL"},

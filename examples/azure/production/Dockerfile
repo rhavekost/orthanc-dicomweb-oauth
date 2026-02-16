@@ -30,8 +30,9 @@ COPY schemas/ /etc/orthanc/plugins/schemas/
 # Set Python path to include plugin directory
 ENV PYTHONPATH=/etc/orthanc/plugins
 
-# Copy Orthanc configuration as template (will be processed at runtime)
-COPY examples/azure/quickstart/orthanc.json /etc/orthanc/orthanc.json.template
+# Copy production Orthanc configuration as template (will be processed at runtime)
+# Uses managed identity for DICOM, SSL for PostgreSQL, connection string for storage
+COPY examples/azure/production/orthanc.json /etc/orthanc/orthanc.json.template
 
 # Copy and make entrypoint script executable
 COPY examples/azure/quickstart/docker-entrypoint.sh /usr/local/bin/custom-entrypoint.sh

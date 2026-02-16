@@ -179,5 +179,7 @@ output postgresServerName string = postgresServerName
 output storageAccountName string = storage.outputs.storageAccountName
 output storageAccountId string = storage.outputs.storageAccountId
 output storageContainerName string = storage.outputs.containerName
+#disable-next-line outputs-should-not-contain-secrets
+output storageConnectionString string = storage.outputs.storageConnectionString
 output vnetId string = network.outputs.vnetId
 output containerAppsSubnetId string = network.outputs.containerAppsSubnetId
