@@ -38,7 +38,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     publicNetworkAccess: publicNetworkAccess
     networkAcls: {
       defaultAction: 'Deny'
-      bypass: 'None'
+      bypass: 'AzureServices'
     }
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
