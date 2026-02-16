@@ -74,7 +74,6 @@ param tags object = {}
 var resourcePrefix = 'orthanc-${environmentName}'
 var containerAppName = '${resourcePrefix}-app'
 var environmentNameContainerApps = '${resourcePrefix}-cae'
-var containerRegistryName = split(containerRegistryLoginServer, '.')[0]
 var containerImage = '${containerRegistryLoginServer}/orthanc-oauth:latest'
 var postgresConnectionString = 'host=${postgresServerName}.postgres.database.azure.com port=5432 dbname=orthanc user=${postgresAdminUsername} password=${postgresAdminPassword} sslmode=require'
 
