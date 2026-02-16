@@ -14,8 +14,8 @@ param privateEndpointSubnetId string
 @description('The ID of the blob Private DNS zone')
 param blobPrivateDnsZoneId string
 
-@description('Disable public network access')
-param publicNetworkAccess string = 'Disabled'
+@description('Public network access setting - Enabled with restrictive network ACLs')
+param publicNetworkAccess string = 'Enabled'
 
 @description('Resource tags')
 param tags object = {}
