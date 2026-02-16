@@ -101,14 +101,13 @@ module storage './modules/storage.bicep' = {
 // Container Registry with Private Endpoint
 // ========================================
 
-module containerRegistry './modules/container-registry.bicep' = {
+module containerRegistry './modules/container-registry-simple.bicep' = {
   scope: rg
   name: 'containerRegistryDeployment'
   params: {
     registryName: containerRegistryName
     location: location
-    privateEndpointSubnetId: network.outputs.privateEndpointsSubnetId
-    acrPrivateDnsZoneId: privateDns.outputs.acrDnsZoneId
+    adminUserEnabled: true
     tags: tags
   }
 }
