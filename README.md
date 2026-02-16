@@ -624,13 +624,9 @@ orthanc-dicomweb-oauth/
 
 ### Coding Standards
 
-**Quality Score: A+ (97/100)**
-
-This project maintains professional-grade code quality standards:
-
 - ✅ **100% type coverage** - All functions fully typed with mypy strict mode
 - ✅ **92% docstring coverage** - Google-style docstrings on all public APIs
-- ✅ **Low complexity** - Average cyclomatic complexity 2.29 (Grade A)
+- ✅ **Low complexity** - Average cyclomatic complexity 2.29
 - ✅ **Comprehensive linting** - pylint (9.18/10), flake8, bandit, vulture, radon
 - ✅ **Pre-commit hooks** - Automatic formatting and quality checks
 - ✅ **CI/CD enforcement** - All quality checks enforced in GitHub Actions
