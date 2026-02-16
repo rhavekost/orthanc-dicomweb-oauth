@@ -39,7 +39,7 @@
   "definitions": {
     "ServerConfig": {
       "type": "object",
-      "required": ["Url", "TokenEndpoint", "ClientId", "ClientSecret"],
+      "required": ["Url"],
       "properties": {
         "Url": {
           "type": "string",
@@ -81,7 +81,7 @@
         },
         "ProviderType": {
           "type": "string",
-          "enum": ["auto", "azure", "google", "keycloak", "generic"],
+          "enum": ["auto", "azure", "google", "keycloak", "generic", "aws", "azuremanagedidentity"],
           "default": "auto",
           "description": "OAuth provider type"
         },
@@ -163,7 +163,19 @@
           "additionalProperties": false
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "ProviderType": { "const": "azuremanagedidentity" }
+        },
+        "required": ["ProviderType"]
+      },
+      "then": {
+        "required": ["Url", "Scope"]
+      },
+      "else": {
+        "required": ["Url", "TokenEndpoint", "ClientId", "ClientSecret"]
+      }
     }
   }
 }

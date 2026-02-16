@@ -81,14 +81,6 @@ class TokenManager:
         self._lock = threading.Lock()
 
         # Configuration
-        self.token_endpoint = config["TokenEndpoint"]
-        self.client_id = config["ClientId"]
-
-        # Encrypt client secret in memory
-        self._encrypted_client_secret = self._secrets_manager.encrypt_secret(
-            config["ClientSecret"]
-        )
-
         self.scope = config.get("Scope", "")
         self.refresh_buffer_seconds = config.get(
             "TokenRefreshBufferSeconds", DEFAULT_REFRESH_BUFFER_SECONDS
@@ -100,13 +92,28 @@ class TokenManager:
         if provider_type == "auto":
             provider_type = OAuthProviderFactory.auto_detect(config)
 
-        self.provider: OAuthProvider = OAuthProviderFactory.create(
-            provider_type=provider_type,
-            config={
-                **config,
-                "ClientSecret": self._get_client_secret(),  # Decrypt only when needed
-            },
-        )
+        # Managed identity doesn't use TokenEndpoint/ClientId/ClientSecret
+        if provider_type == "azuremanagedidentity":
+            self.token_endpoint = ""
+            self.client_id = ""
+            self._encrypted_client_secret = b""
+            self.provider: OAuthProvider = OAuthProviderFactory.create(
+                provider_type=provider_type,
+                config=config,
+            )
+        else:
+            self.token_endpoint = config["TokenEndpoint"]
+            self.client_id = config["ClientId"]
+            self._encrypted_client_secret = self._secrets_manager.encrypt_secret(
+                config["ClientSecret"]
+            )
+            self.provider = OAuthProviderFactory.create(
+                provider_type=provider_type,
+                config={
+                    **config,
+                    "ClientSecret": self._get_client_secret(),
+                },
+            )
 
         # Initialize resilience features
         self._circuit_breaker = self._create_circuit_breaker(config)
@@ -149,7 +156,12 @@ class TokenManager:
 
     def _validate_config(self) -> None:
         """Validate that required configuration keys are present."""
-        required_keys = ["TokenEndpoint", "ClientId", "ClientSecret"]
+        provider_type = self.config.get("ProviderType", "auto")
+        if provider_type == "azuremanagedidentity":
+            # Managed identity only requires Url and Scope
+            required_keys = ["Url", "Scope"]
+        else:
+            required_keys = ["TokenEndpoint", "ClientId", "ClientSecret"]
         missing_keys = [key for key in required_keys if key not in self.config]
 
         if missing_keys:
