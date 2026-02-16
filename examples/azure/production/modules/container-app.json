@@ -1,0 +1,204 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "2085420806547310229"
+    }
+  },
+  "parameters": {
+    "containerAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Container App"
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the Container Apps Environment"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location for the Container App"
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "metadata": {
+        "description": "The container image to deploy"
+      }
+    },
+    "containerAppsSubnetId": {
+      "type": "string",
+      "metadata": {
+        "description": "The ID of the Container Apps subnet"
+      }
+    },
+    "orthancUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Orthanc admin username"
+      }
+    },
+    "orthancPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Orthanc admin password"
+      }
+    },
+    "postgresConnectionString": {
+      "type": "securestring",
+      "metadata": {
+        "description": "PostgreSQL connection string"
+      }
+    },
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Storage account name"
+      }
+    },
+    "storageContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "Storage container name"
+      }
+    },
+    "dicomServiceUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "DICOM service URL"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Resource tags"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.App/managedEnvironments",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('environmentName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "vnetConfiguration": {
+          "infrastructureSubnetId": "[parameters('containerAppsSubnetId')]",
+          "internal": false
+        },
+        "zoneRedundant": false
+      }
+    },
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2023-05-01",
+      "name": "[parameters('containerAppName')]",
+      "location": "[parameters('location')]",
+      "tags": "[parameters('tags')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": 8042,
+            "transport": "http",
+            "allowInsecure": false
+          },
+          "secrets": [
+            {
+              "name": "orthanc-password",
+              "value": "[parameters('orthancPassword')]"
+            },
+            {
+              "name": "postgres-connection-string",
+              "value": "[parameters('postgresConnectionString')]"
+            }
+          ]
+        },
+        "template": {
+          "containers": [
+            {
+              "name": "orthanc-oauth",
+              "image": "[parameters('containerImage')]",
+              "resources": {
+                "cpu": "[json('1.0')]",
+                "memory": "2Gi"
+              },
+              "env": [
+                {
+                  "name": "ORTHANC_USERNAME",
+                  "value": "[parameters('orthancUsername')]"
+                },
+                {
+                  "name": "ORTHANC_PASSWORD",
+                  "secretRef": "orthanc-password"
+                },
+                {
+                  "name": "POSTGRES_CONNECTION_STRING",
+                  "secretRef": "postgres-connection-string"
+                },
+                {
+                  "name": "AZURE_STORAGE_ACCOUNT",
+                  "value": "[parameters('storageAccountName')]"
+                },
+                {
+                  "name": "AZURE_STORAGE_CONTAINER",
+                  "value": "[parameters('storageContainerName')]"
+                },
+                {
+                  "name": "DICOM_SERVICE_URL",
+                  "value": "[parameters('dicomServiceUrl')]"
+                },
+                {
+                  "name": "USE_MANAGED_IDENTITY",
+                  "value": "true"
+                }
+              ]
+            }
+          ],
+          "scale": {
+            "minReplicas": 1,
+            "maxReplicas": 3
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "containerAppId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.App/containerApps', parameters('containerAppName'))]"
+    },
+    "containerAppName": {
+      "type": "string",
+      "value": "[parameters('containerAppName')]"
+    },
+    "containerAppUrl": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName')), '2023-05-01').configuration.ingress.fqdn]"
+    },
+    "containerAppPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName')), '2023-05-01', 'full').identity.principalId]"
+    },
+    "environmentId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]"
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.38.33.27573",
+      "templateHash": "11854945072823653515"
+    }
+  },
+  "parameters": {
+    "containerAppPrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "The principal ID of the Container App managed identity"
+      }
+    },
+    "dicomServiceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The ID of the DICOM service"
+      }
+    },
+    "storageAccountId": {
+      "type": "string",
+      "metadata": {
+        "description": "The ID of the storage account"
+      }
+    },
+    "containerRegistryId": {
+      "type": "string",
+      "metadata": {
+        "description": "The ID of the container registry"
+      }
+    }
+  },
+  "variables": {
+    "dicomDataOwnerRoleId": "58a3b984-7adf-4c20-983a-32417c86fbc8",
+    "storageBlobDataContributorRoleId": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+    "acrPullRoleId": "7f951dda-4ed3-4680-a7ca-43fe172d538d"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.HealthcareApis/workspaces/{0}/dicomservices/{1}', split(format('{0}/{1}', split(parameters('dicomServiceId'), '/')[8], split(parameters('dicomServiceId'), '/')[10]), '/')[0], split(format('{0}/{1}', split(parameters('dicomServiceId'), '/')[8], split(parameters('dicomServiceId'), '/')[10]), '/')[1])]",
+      "name": "[guid(parameters('dicomServiceId'), parameters('containerAppPrincipalId'), variables('dicomDataOwnerRoleId'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('dicomDataOwnerRoleId'))]",
+        "principalId": "[parameters('containerAppPrincipalId')]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.Storage/storageAccounts/{0}', split(parameters('storageAccountId'), '/')[8])]",
+      "name": "[guid(parameters('storageAccountId'), parameters('containerAppPrincipalId'), variables('storageBlobDataContributorRoleId'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('storageBlobDataContributorRoleId'))]",
+        "principalId": "[parameters('containerAppPrincipalId')]",
+        "principalType": "ServicePrincipal"
+      }
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', split(parameters('containerRegistryId'), '/')[8])]",
+      "name": "[guid(parameters('containerRegistryId'), parameters('containerAppPrincipalId'), variables('acrPullRoleId'))]",
+      "properties": {
+        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleId'))]",
+        "principalId": "[parameters('containerAppPrincipalId')]",
+        "principalType": "ServicePrincipal"
+      }
+    }
+  ],
+  "outputs": {
+    "dicomRoleAssignmentId": {
+      "type": "string",
+      "value": "[extensionResourceId(resourceId('Microsoft.HealthcareApis/workspaces/dicomservices', split(format('{0}/{1}', split(parameters('dicomServiceId'), '/')[8], split(parameters('dicomServiceId'), '/')[10]), '/')[0], split(format('{0}/{1}', split(parameters('dicomServiceId'), '/')[8], split(parameters('dicomServiceId'), '/')[10]), '/')[1]), 'Microsoft.Authorization/roleAssignments', guid(parameters('dicomServiceId'), parameters('containerAppPrincipalId'), variables('dicomDataOwnerRoleId')))]"
+    },
+    "storageRoleAssignmentId": {
+      "type": "string",
+      "value": "[extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', split(parameters('storageAccountId'), '/')[8]), 'Microsoft.Authorization/roleAssignments', guid(parameters('storageAccountId'), parameters('containerAppPrincipalId'), variables('storageBlobDataContributorRoleId')))]"
+    },
+    "acrRoleAssignmentId": {
+      "type": "string",
+      "value": "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', split(parameters('containerRegistryId'), '/')[8]), 'Microsoft.Authorization/roleAssignments', guid(parameters('containerRegistryId'), parameters('containerAppPrincipalId'), variables('acrPullRoleId')))]"
+    }
+  }
+}

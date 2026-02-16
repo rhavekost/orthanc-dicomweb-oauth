@@ -5,20 +5,14 @@
     "_generator": {
       "name": "bicep",
       "version": "0.38.33.27573",
-      "templateHash": "12041918349947318763"
+      "templateHash": "18059392520103949973"
     }
   },
   "parameters": {
     "vnetId": {
       "type": "string",
       "metadata": {
-        "description": "Virtual Network ID to link DNS zones to"
-      }
-    },
-    "vnetName": {
-      "type": "string",
-      "metadata": {
-        "description": "Virtual Network name for link naming"
+        "description": "The ID of the VNet to link DNS zones to"
       }
     },
     "tags": {
@@ -45,9 +39,16 @@
       "tags": "[parameters('tags')]"
     },
     {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "privatelink.azurecr.io",
+      "location": "global",
+      "tags": "[parameters('tags')]"
+    },
+    {
       "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
       "apiVersion": "2020-06-01",
-      "name": "[format('{0}/{1}', 'privatelink.postgres.database.azure.com', format('{0}-postgres-link', parameters('vnetName')))]",
+      "name": "[format('{0}/{1}', 'privatelink.postgres.database.azure.com', 'postgres-vnet-link')]",
       "location": "global",
       "tags": "[parameters('tags')]",
       "properties": {
@@ -63,7 +64,7 @@
     {
       "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
       "apiVersion": "2020-06-01",
-      "name": "[format('{0}/{1}', format('privatelink.blob.{0}', environment().suffixes.storage), format('{0}-blob-link', parameters('vnetName')))]",
+      "name": "[format('{0}/{1}', format('privatelink.blob.{0}', environment().suffixes.storage), 'blob-vnet-link')]",
       "location": "global",
       "tags": "[parameters('tags')]",
       "properties": {
@@ -74,6 +75,22 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Network/privateDnsZones', format('privatelink.blob.{0}', environment().suffixes.storage))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', 'privatelink.azurecr.io', 'acr-vnet-link')]",
+      "location": "global",
+      "tags": "[parameters('tags')]",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[parameters('vnetId')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.azurecr.io')]"
       ]
     }
   ],
@@ -86,13 +103,9 @@
       "type": "string",
       "value": "[resourceId('Microsoft.Network/privateDnsZones', format('privatelink.blob.{0}', environment().suffixes.storage))]"
     },
-    "postgresDnsZoneName": {
+    "acrDnsZoneId": {
       "type": "string",
-      "value": "privatelink.postgres.database.azure.com"
-    },
-    "blobDnsZoneName": {
-      "type": "string",
-      "value": "[format('privatelink.blob.{0}', environment().suffixes.storage)]"
+      "value": "[resourceId('Microsoft.Network/privateDnsZones', 'privatelink.azurecr.io')]"
     }
   }
 }

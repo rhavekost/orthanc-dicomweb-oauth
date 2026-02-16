@@ -173,6 +173,14 @@ module healthcareWorkspace '../quickstart/modules/healthcare-workspace.bicep' = 
 var containerImage = '${containerRegistryName}.azurecr.io/orthanc-oauth:latest'
 var postgresConnectionString = 'host=${postgresServerName}.postgres.database.azure.com port=5432 dbname=orthanc user=${postgresAdminUsername} password=${postgresAdminPassword} sslmode=require'
 
+// Get ACR admin credentials for Container App image pull
+resource acrResource 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: containerRegistryName
+  scope: rg
+}
+
+var acrCredentials = acrResource.listCredentials()
+
 module containerApp './modules/container-app.bicep' = {
   scope: rg
   name: 'containerAppDeployment'
@@ -181,6 +189,9 @@ module containerApp './modules/container-app.bicep' = {
     environmentName: environmentNameContainerApps
     location: location
     containerImage: containerImage
+    containerRegistryServer: containerRegistry.outputs.containerRegistryLoginServer
+    containerRegistryUsername: acrCredentials.username
+    containerRegistryPassword: acrCredentials.passwords[0].value
     containerAppsSubnetId: network.outputs.containerAppsSubnetId
     orthancUsername: orthancUsername
     orthancPassword: orthancPassword
@@ -190,6 +201,9 @@ module containerApp './modules/container-app.bicep' = {
     dicomServiceUrl: healthcareWorkspace.outputs.dicomServiceUrl
     tags: tags
   }
+  dependsOn: [
+    containerRegistry
+  ]
 }
 
 // ========================================

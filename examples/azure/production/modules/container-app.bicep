@@ -37,6 +37,16 @@ param storageContainerName string
 @description('DICOM service URL')
 param dicomServiceUrl string
 
+@description('Container registry login server')
+param containerRegistryServer string
+
+@description('Container registry admin username')
+param containerRegistryUsername string
+
+@description('Container registry admin password')
+@secure()
+param containerRegistryPassword string
+
 @description('Resource tags')
 param tags object = {}
 
@@ -77,7 +87,18 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
         transport: 'http'
         allowInsecure: false
       }
+      registries: [
+        {
+          server: containerRegistryServer
+          username: containerRegistryUsername
+          passwordSecretRef: 'acr-password'
+        }
+      ]
       secrets: [
+        {
+          name: 'acr-password'
+          value: containerRegistryPassword
+        }
         {
           name: 'orthanc-password'
           value: orthancPassword
