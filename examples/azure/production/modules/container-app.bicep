@@ -74,6 +74,12 @@ resource environment 'Microsoft.App/managedEnvironments@2023-05-01' = {
       internal: false  // External ingress
     }
     zoneRedundant: false
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
   }
 }
 
