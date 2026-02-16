@@ -1,3 +1,8 @@
 main.json
+main-infra.json
+main-app.json
 deployment-details.json
 deployment-output.json
+infrastructure-output.json
+app-output.json
+deploy-original.sh.bak

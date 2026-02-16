@@ -2,13 +2,10 @@
 set -e
 
 # Production Deployment Script for Orthanc with OAuth
-# This script deploys the full production environment including:
-# - Private VNet with subnets
-# - Azure Container Registry
-# - PostgreSQL Flexible Server
-# - Azure Storage Account
-# - Azure Container Apps (with VNet integration)
-# - Azure Healthcare APIs DICOM service
+# Split Deployment Approach:
+# - Phase 2: Deploy Infrastructure (ACR, VNet, PostgreSQL, Storage, Healthcare APIs)
+# - Phase 3: Build and Push Docker Image
+# - Phase 4: Deploy Container App (after image exists in ACR)
 
 echo "=========================================="
 echo "Orthanc OAuth Production Deployment"
@@ -87,18 +84,18 @@ echo "Resource Group: $RG_NAME"
 echo "Orthanc Username: $ORTHANC_USERNAME"
 echo "PostgreSQL Username: $POSTGRES_USERNAME"
 echo ""
-echo "Generated secure passwords for Orthanc and PostgreSQL"
+echo "Secure passwords loaded from $DETAILS_FILE"
 echo ""
 
 #############################################
-# Phase 2: Deploy Network Infrastructure
+# Phase 2: Deploy Infrastructure Only
 #############################################
-echo "Phase 2: Deploy Network Infrastructure"
+echo "Phase 2: Deploy Infrastructure (VNet, ACR, PostgreSQL, Storage, Healthcare APIs)"
 echo "----------------------------------------"
 
-# Deploy using subscription-level deployment with secure parameter file
-echo "Starting Azure deployment..."
-DEPLOYMENT_NAME="orthanc-oauth-${ENV_NAME}-$(date +%Y%m%d-%H%M%S)"
+# Deploy infrastructure without Container App
+echo "Starting infrastructure deployment..."
+DEPLOYMENT_NAME="orthanc-oauth-infra-${ENV_NAME}-$(date +%Y%m%d-%H%M%S)"
 
 # Create temporary parameter file to avoid password exposure in process list
 PARAM_FILE=$(mktemp)
@@ -112,8 +109,6 @@ cat > "$PARAM_FILE" <<EOF
     "environmentName": {"value": "$ENV_NAME"},
     "location": {"value": "$LOCATION"},
     "resourceGroupName": {"value": "$RG_NAME"},
-    "orthancUsername": {"value": "$ORTHANC_USERNAME"},
-    "orthancPassword": {"value": "$ORTHANC_PASSWORD"},
     "postgresAdminUsername": {"value": "$POSTGRES_USERNAME"},
     "postgresAdminPassword": {"value": "$POSTGRES_PASSWORD"}
   }
@@ -123,50 +118,54 @@ EOF
 az deployment sub create \
   --name "$DEPLOYMENT_NAME" \
   --location "$LOCATION" \
-  --template-file "$SCRIPT_DIR/main.bicep" \
+  --template-file "$SCRIPT_DIR/main-infra.bicep" \
   --parameters "@$PARAM_FILE" \
-  -o json > "$SCRIPT_DIR/deployment-output.json"
+  -o json > "$SCRIPT_DIR/infrastructure-output.json"
 
 # Check deployment status
 if [ $? -ne 0 ]; then
-  echo "ERROR: Azure deployment failed"
+  echo "ERROR: Infrastructure deployment failed"
   exit 1
 fi
 
-echo "Azure infrastructure deployment completed successfully"
+echo "Infrastructure deployment completed successfully"
 echo ""
 
 #############################################
-# Phase 3: Extract Deployment Details
+# Phase 3: Extract Infrastructure Outputs
 #############################################
-echo "Phase 3: Extract Deployment Details"
+echo "Phase 3: Extract Infrastructure Outputs"
 echo "----------------------------------------"
 
 # Extract all critical outputs using jq
-ACR_NAME=$(jq -r '.properties.outputs.containerRegistryName.value' "$SCRIPT_DIR/deployment-output.json")
-ACR_LOGIN_SERVER=$(jq -r '.properties.outputs.containerRegistryLoginServer.value' "$SCRIPT_DIR/deployment-output.json")
-CONTAINER_APP_URL=$(jq -r '.properties.outputs.containerAppUrl.value' "$SCRIPT_DIR/deployment-output.json")
-DICOM_URL=$(jq -r '.properties.outputs.dicomServiceUrl.value' "$SCRIPT_DIR/deployment-output.json")
-POSTGRES_FQDN=$(jq -r '.properties.outputs.postgresServerFqdn.value' "$SCRIPT_DIR/deployment-output.json")
-STORAGE_NAME=$(jq -r '.properties.outputs.storageAccountName.value' "$SCRIPT_DIR/deployment-output.json")
-RESOURCE_GROUP=$(jq -r '.properties.outputs.resourceGroupName.value' "$SCRIPT_DIR/deployment-output.json")
-VNET_ID=$(jq -r '.properties.outputs.vnetId.value' "$SCRIPT_DIR/deployment-output.json")
+ACR_NAME=$(jq -r '.properties.outputs.containerRegistryName.value' "$SCRIPT_DIR/infrastructure-output.json")
+ACR_LOGIN_SERVER=$(jq -r '.properties.outputs.containerRegistryLoginServer.value' "$SCRIPT_DIR/infrastructure-output.json")
+ACR_USERNAME=$(jq -r '.properties.outputs.containerRegistryAdminUsername.value' "$SCRIPT_DIR/infrastructure-output.json")
+ACR_PASSWORD=$(jq -r '.properties.outputs.containerRegistryAdminPassword.value' "$SCRIPT_DIR/infrastructure-output.json")
+DICOM_URL=$(jq -r '.properties.outputs.dicomServiceUrl.value' "$SCRIPT_DIR/infrastructure-output.json")
+DICOM_ID=$(jq -r '.properties.outputs.dicomServiceId.value' "$SCRIPT_DIR/infrastructure-output.json")
+POSTGRES_FQDN=$(jq -r '.properties.outputs.postgresServerFqdn.value' "$SCRIPT_DIR/infrastructure-output.json")
+POSTGRES_NAME=$(jq -r '.properties.outputs.postgresServerName.value' "$SCRIPT_DIR/infrastructure-output.json")
+STORAGE_NAME=$(jq -r '.properties.outputs.storageAccountName.value' "$SCRIPT_DIR/infrastructure-output.json")
+STORAGE_ID=$(jq -r '.properties.outputs.storageAccountId.value' "$SCRIPT_DIR/infrastructure-output.json")
+STORAGE_CONTAINER=$(jq -r '.properties.outputs.storageContainerName.value' "$SCRIPT_DIR/infrastructure-output.json")
+RESOURCE_GROUP=$(jq -r '.properties.outputs.resourceGroupName.value' "$SCRIPT_DIR/infrastructure-output.json")
+VNET_ID=$(jq -r '.properties.outputs.vnetId.value' "$SCRIPT_DIR/infrastructure-output.json")
+CONTAINER_APPS_SUBNET_ID=$(jq -r '.properties.outputs.containerAppsSubnetId.value' "$SCRIPT_DIR/infrastructure-output.json")
 
 # Validate all critical outputs
-for var in ACR_NAME ACR_LOGIN_SERVER CONTAINER_APP_URL DICOM_URL; do
+for var in ACR_NAME ACR_LOGIN_SERVER DICOM_URL POSTGRES_NAME STORAGE_NAME; do
   eval value=\$$var
   if [ -z "$value" ] || [ "$value" = "null" ]; then
-    echo "ERROR: Failed to extract $var from deployment output"
+    echo "ERROR: Failed to extract $var from infrastructure output"
     exit 1
   fi
 done
 
-echo "Container Registry Name: $ACR_NAME"
-echo "Container Registry Server: $ACR_LOGIN_SERVER"
-echo "Container App URL: $CONTAINER_APP_URL"
-echo "DICOM Service URL: $DICOM_URL"
-echo "PostgreSQL Server FQDN: $POSTGRES_FQDN"
-echo "Storage Account Name: $STORAGE_NAME"
+echo "Container Registry: $ACR_NAME ($ACR_LOGIN_SERVER)"
+echo "DICOM Service: $DICOM_URL"
+echo "PostgreSQL Server: $POSTGRES_FQDN"
+echo "Storage Account: $STORAGE_NAME"
 echo "Resource Group: $RESOURCE_GROUP"
 echo ""
 
@@ -204,40 +203,61 @@ echo "Docker image built and pushed successfully: $IMAGE_TAG"
 echo ""
 
 #############################################
-# Phase 5: Restart Container App
+# Phase 5: Deploy Container App
 #############################################
-echo "Phase 5: Restart Container App"
+echo "Phase 5: Deploy Container App + RBAC"
 echo "----------------------------------------"
 
-# Find container app name
-CONTAINER_APP_NAME=$(az containerapp list \
-  --resource-group "$RG_NAME" \
-  --query "[0].name" \
-  --output tsv)
+echo "Deploying Container App to resource group $RESOURCE_GROUP..."
+APP_DEPLOYMENT_NAME="orthanc-oauth-app-${ENV_NAME}-$(date +%Y%m%d-%H%M%S)"
 
-if [ -z "$CONTAINER_APP_NAME" ]; then
-  echo "ERROR: Failed to find Container App in resource group $RG_NAME"
+# Create parameter file for Container App deployment
+APP_PARAM_FILE=$(mktemp)
+trap 'rm -f "$APP_PARAM_FILE"' EXIT
+
+cat > "$APP_PARAM_FILE" <<EOF
+{
+  "\$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {"value": "$ENV_NAME"},
+    "location": {"value": "$LOCATION"},
+    "orthancUsername": {"value": "$ORTHANC_USERNAME"},
+    "orthancPassword": {"value": "$ORTHANC_PASSWORD"},
+    "postgresAdminUsername": {"value": "$POSTGRES_USERNAME"},
+    "postgresAdminPassword": {"value": "$POSTGRES_PASSWORD"},
+    "containerRegistryLoginServer": {"value": "$ACR_LOGIN_SERVER"},
+    "containerRegistryAdminUsername": {"value": "$ACR_USERNAME"},
+    "containerRegistryAdminPassword": {"value": "$ACR_PASSWORD"},
+    "containerRegistryId": {"value": "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ContainerRegistry/registries/$ACR_NAME"},
+    "containerAppsSubnetId": {"value": "$CONTAINER_APPS_SUBNET_ID"},
+    "storageAccountName": {"value": "$STORAGE_NAME"},
+    "storageContainerName": {"value": "$STORAGE_CONTAINER"},
+    "storageAccountId": {"value": "$STORAGE_ID"},
+    "dicomServiceUrl": {"value": "$DICOM_URL"},
+    "dicomServiceId": {"value": "$DICOM_ID"},
+    "postgresServerName": {"value": "$POSTGRES_NAME"}
+  }
+}
+EOF
+
+az deployment group create \
+  --name "$APP_DEPLOYMENT_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --template-file "$SCRIPT_DIR/main-app.bicep" \
+  --parameters "@$APP_PARAM_FILE" \
+  -o json > "$SCRIPT_DIR/app-output.json"
+
+if [ $? -ne 0 ]; then
+  echo "ERROR: Container App deployment failed"
   exit 1
 fi
 
-echo "Container App Name: $CONTAINER_APP_NAME"
-
-# Restart container app to pull new image
-echo "Restarting Container App to pull new image..."
-az containerapp revision restart \
-  --name "$CONTAINER_APP_NAME" \
-  --resource-group "$RG_NAME" \
-  --revision "$(az containerapp revision list \
-    --name "$CONTAINER_APP_NAME" \
-    --resource-group "$RG_NAME" \
-    --query "[0].name" \
-    --output tsv)"
-
-if [ $? -ne 0 ]; then
-  echo "WARNING: Container App restart failed, but deployment may still be successful"
-fi
-
+echo "Container App deployment completed successfully"
 echo ""
+
+# Extract Container App URL
+CONTAINER_APP_URL=$(jq -r '.properties.outputs.containerAppUrl.value' "$SCRIPT_DIR/app-output.json")
 
 #############################################
 # Deployment Complete
@@ -251,7 +271,14 @@ echo "  URL: https://$CONTAINER_APP_URL"
 echo "  Username: $ORTHANC_USERNAME"
 echo "  Password: $ORTHANC_PASSWORD"
 echo ""
-echo "Credentials saved to: $SCRIPT_DIR/deployment-output.json"
+echo "Infrastructure Details:"
+echo "  Resource Group: $RESOURCE_GROUP"
+echo "  Container Registry: $ACR_NAME"
+echo "  PostgreSQL Server: $POSTGRES_FQDN"
+echo "  DICOM Service: $DICOM_URL"
+echo "  Storage Account: $STORAGE_NAME"
+echo ""
+echo "Credentials saved to: $SCRIPT_DIR/deployment-details.json"
 echo ""
 echo "IMPORTANT: Save these credentials securely!"
 echo "  Orthanc Username: $ORTHANC_USERNAME"
