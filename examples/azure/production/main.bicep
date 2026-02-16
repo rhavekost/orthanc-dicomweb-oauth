@@ -189,7 +189,7 @@ module containerApp './modules/container-app.bicep' = {
     environmentName: environmentNameContainerApps
     location: location
     containerImage: containerImage
-    containerRegistryServer: containerRegistry.outputs.containerRegistryLoginServer
+    containerRegistryServer: containerRegistry.outputs.loginServer
     containerRegistryUsername: acrCredentials.username
     containerRegistryPassword: acrCredentials.passwords[0].value
     containerAppsSubnetId: network.outputs.containerAppsSubnetId
