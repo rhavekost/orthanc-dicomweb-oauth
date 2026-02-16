@@ -7,7 +7,8 @@ This plugin supports multiple OAuth2 providers through both specialized provider
 | Provider | Status | Provider Type | Auto-detection | Configuration Complexity |
 |----------|--------|---------------|----------------|-------------------------|
 | **Azure Entra ID** | ✅ Fully supported | `azure` (specialized) | ✅ Yes | Low |
-| **Google Cloud Healthcare API** | ✅ Fully supported | `google` (specialized) | ✅ Yes | Low |
+| **Azure Managed Identity** | ✅ Fully supported | `azuremanagedidentity` | N/A (explicit) | Very Low |
+| **Google Cloud Healthcare API** | 🔬 Implemented | `google` (specialized) | ✅ Yes | Low |
 | **AWS HealthImaging** | ⚠️ Basic support | `aws` (specialized) | ✅ Yes | Medium |
 | **Keycloak** | ✅ Supported | `generic` | ✅ Yes | Low |
 | **Auth0** | ✅ Supported | `generic` | ❌ No | Low |
@@ -15,6 +16,11 @@ This plugin supports multiple OAuth2 providers through both specialized provider
 | **Other OAuth2** | ✅ Supported | `generic` | ❌ No | Varies |
 
 ## When to Use Specialized vs Generic Provider
+
+**Use managed identity when:**
+- Running on Azure (Container Apps, VMs, App Service) with managed identity enabled
+- You want zero-secret configuration (no client credentials to manage)
+- The target service supports Azure RBAC (e.g., Azure Health Data Services)
 
 **Use specialized provider when:**
 - Your provider is in the list above (Azure, Google, AWS)
@@ -71,6 +77,54 @@ This plugin supports multiple OAuth2 providers through both specialized provider
    - Set `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` environment variables
 
 **Quick Start:** [Azure Quick Start Guide](quickstart-azure.md)
+
+---
+
+## Azure Managed Identity
+
+**Class:** `AzureManagedIdentityProvider`
+
+**Recommended for:** Azure Container Apps, Azure VMs, or Azure App Service deployments with managed identity enabled
+
+**Configuration:**
+
+```json
+{
+  "ProviderType": "azuremanagedidentity",
+  "Scope": "https://dicom.healthcareapis.azure.com/.default"
+}
+```
+
+**How It Works:**
+- Uses `DefaultAzureCredential` from the Azure Identity SDK
+- No `TokenEndpoint`, `ClientId`, or `ClientSecret` needed
+- Automatically uses the managed identity assigned to the Azure resource
+- Supports both system-assigned and user-assigned managed identities
+
+**Setup Steps:**
+
+1. **Enable Managed Identity:**
+   - Azure Container Apps: Enabled by default (system-assigned)
+   - Azure VM: Settings → Identity → System assigned → On
+   - Azure App Service: Identity → System assigned → On
+
+2. **Grant RBAC Role:**
+   - Navigate to your Azure Health Data Services DICOM service
+   - Access control (IAM) → Add role assignment
+   - Role: "DICOM Data Owner" (or "DICOM Data Reader" for read-only)
+   - Assign to: The managed identity of your compute resource
+
+3. **Configure Plugin:**
+   - Only `Url`, `ProviderType`, and `Scope` are needed
+   - No secrets to manage or rotate
+
+**Advantages over Client Credentials:**
+- Zero secrets to manage, store, or rotate
+- No risk of credential leakage
+- Azure handles token lifecycle automatically
+- Simplified compliance (no shared secrets)
+
+**Quick Start:** [Production Deployment Guide](../examples/azure/production/README.md)
 
 ---
 
@@ -231,15 +285,16 @@ provider = GenericProvider(config)
 
 ## Provider Feature Comparison
 
-| Feature | Azure | Google | AWS | Generic |
-|---------|-------|--------|-----|---------|
-| **Auto-detection** | ✅ | ✅ | ✅ | - |
-| **JWT validation** | ✅ | ✅ | ✅ | ❌ |
-| **Token refresh** | ✅ | ✅ | ✅ | ✅ |
-| **Retry logic** | ✅ | ✅ | ✅ | ✅ |
-| **Error messages** | Azure-specific | Google-specific | AWS-specific | Generic |
-| **Setup complexity** | Low | Low | Medium | Low |
-| **Dependencies** | None extra | None extra | boto3 | None |
+| Feature | Azure | Azure MI | Google | AWS | Generic |
+|---------|-------|----------|--------|-----|---------|
+| **Auto-detection** | ✅ | N/A | ✅ | ✅ | - |
+| **JWT validation** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Token refresh** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Retry logic** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Zero secrets** | ❌ | ✅ | ❌ | ❌ | ❌ |
+| **Error messages** | Azure-specific | Azure-specific | Google-specific | AWS-specific | Generic |
+| **Setup complexity** | Low | Very Low | Low | Medium | Low |
+| **Dependencies** | None extra | azure-identity | None extra | boto3 | None |
 
 ## Troubleshooting by Provider
 

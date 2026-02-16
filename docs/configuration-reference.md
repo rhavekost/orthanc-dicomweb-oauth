@@ -30,15 +30,18 @@ Each server under `Servers` represents a DICOMweb endpoint that requires OAuth2 
 | Field | Type | Description |
 |-------|------|-------------|
 | `Url` | string | Base URL of the DICOMweb server (must match request URLs) |
-| `TokenEndpoint` | string | OAuth2 token endpoint URL for client credentials flow |
-| `ClientId` | string | OAuth2 client identifier |
-| `ClientSecret` | string | OAuth2 client secret |
+| `TokenEndpoint` | string* | OAuth2 token endpoint URL for client credentials flow |
+| `ClientId` | string* | OAuth2 client identifier |
+| `ClientSecret` | string* | OAuth2 client secret |
+
+*\* Not required when `ProviderType` is `"azuremanagedidentity"`. For managed identity, only `Url` and `Scope` are required.*
 
 ### Optional Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `Scope` | string | `""` | OAuth2 scope parameter (space-separated if multiple) |
+| `ProviderType` | string | `"auto"` | Provider type (`auto`, `azure`, `google`, `aws`, `keycloak`, `generic`, `azuremanagedidentity`) |
 | `TokenRefreshBufferSeconds` | integer | `300` | Seconds before expiry to trigger proactive refresh |
 | `VerifySSL` | boolean/string | `true` | SSL/TLS certificate verification (true/false/path) |
 
@@ -60,6 +63,27 @@ Each server under `Servers` represents a DICOMweb endpoint that requires OAuth2 
   }
 }
 ```
+
+### Azure Managed Identity Configuration
+
+For Azure deployments with managed identity (no client credentials needed):
+
+```json
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "azure-dicom": {
+        "Url": "https://workspace-dicom.dicom.azurehealthcareapis.com/v2/",
+        "ProviderType": "azuremanagedidentity",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
+        "VerifySSL": true
+      }
+    }
+  }
+}
+```
+
+Uses `DefaultAzureCredential` from the Azure Identity SDK. The managed identity of the Azure compute resource (Container App, VM, etc.) must have the appropriate RBAC role (e.g., "DICOM Data Owner") on the target service.
 
 ### Complete Configuration
 

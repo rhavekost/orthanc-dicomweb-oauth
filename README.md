@@ -62,8 +62,8 @@ This plugin enables seamless integration with OAuth-protected DICOMweb endpoints
 
 ### Verified Working With
 
-- ✅ **Azure Health Data Services DICOM** - Full transparent integration
-- ✅ **Google Cloud Healthcare API** - Token acquisition and forwarding
+- ✅ **Azure Health Data Services DICOM** - Full transparent integration (client credentials and managed identity)
+- 🔬 **Google Cloud Healthcare API** - Implemented but not yet verified in production
 - 🔄 **Other OAuth2 providers** - Should work, needs testing
 
 ### Example Configuration
@@ -234,6 +234,26 @@ The plugin automatically detects Azure, Google, and Keycloak providers:
 }
 ```
 
+### Azure Managed Identity (Zero Secrets)
+
+For Azure Container Apps or Azure VMs with managed identity enabled, no client credentials are needed:
+
+```json
+{
+  "DicomWebOAuth": {
+    "Servers": {
+      "azure-dicom": {
+        "Url": "https://workspace-dicom.dicom.azurehealthcareapis.com/v2/",
+        "ProviderType": "azuremanagedidentity",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default"
+      }
+    }
+  }
+}
+```
+
+This uses `DefaultAzureCredential` from the Azure Identity SDK - no `TokenEndpoint`, `ClientId`, or `ClientSecret` required. See the [Production Deployment Guide](examples/azure/production/README.md) for a complete example.
+
 ### Full Configuration Example
 
 ```json
@@ -284,13 +304,15 @@ The plugin automatically detects Azure, Google, and Keycloak providers:
 | Option | Required | Description | Default |
 |--------|----------|-------------|---------|
 | `Url` | Yes | DICOMweb server base URL | - |
-| `TokenEndpoint` | Yes | OAuth2 token endpoint | - |
-| `ClientId` | Yes | OAuth2 client ID | - |
-| `ClientSecret` | Yes | OAuth2 client secret | - |
+| `TokenEndpoint` | Yes* | OAuth2 token endpoint | - |
+| `ClientId` | Yes* | OAuth2 client ID | - |
+| `ClientSecret` | Yes* | OAuth2 client secret | - |
 | `Scope` | No | OAuth2 scope | `""` |
 | `TokenRefreshBufferSeconds` | No | Refresh buffer (seconds) | `300` |
-| `ProviderType` | No | Provider type (auto-detected) | `"generic"` |
+| `ProviderType` | No | Provider type (auto-detected) | `"auto"` |
 | `VerifySSL` | No | Verify SSL certificates | `true` |
+
+*\* Not required when `ProviderType` is `"azuremanagedidentity"`. Managed identity uses `DefaultAzureCredential` instead of client credentials.*
 
 **JWT Validation Options:**
 
@@ -581,7 +603,8 @@ orthanc-dicomweb-oauth/
 │   │   ├── generic.py                  # Generic OAuth2 provider
 │   │   ├── azure.py                    # Azure Entra ID provider
 │   │   ├── google.py                   # Google Cloud provider
-│   │   └── aws.py                      # AWS provider (basic)
+│   │   ├── aws.py                      # AWS provider (basic)
+│   │   └── managed_identity.py         # Azure Managed Identity provider
 │   ├── cache/                          # Cache implementations
 │   │   ├── base.py                     # Cache interface
 │   │   ├── memory_cache.py             # In-memory cache
