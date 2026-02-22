@@ -14,5 +14,5 @@ types-requests==2.31.0.20240106
 types-PyJWT==1.7.1
 pylint==3.0.3
 radon==6.0.1
-vulture==2.11
+vulture==2.14
 pydocstyle==6.3.0
