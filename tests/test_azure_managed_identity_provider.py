@@ -21,7 +21,7 @@ def test_managed_identity_provider_initialization():
     assert provider.provider_name == "azure_managed_identity"
 
 
-@patch("src.oauth_providers.managed_identity.DefaultAzureCredential")
+@patch("azure.identity.DefaultAzureCredential")
 @patch("src.oauth_providers.managed_identity.time")
 def test_acquire_token_success(mock_time, mock_credential_class):
     """Test token acquisition via managed identity."""
@@ -51,7 +51,7 @@ def test_acquire_token_success(mock_time, mock_credential_class):
     )
 
 
-@patch("src.oauth_providers.managed_identity.DefaultAzureCredential")
+@patch("azure.identity.DefaultAzureCredential")
 def test_acquire_token_authentication_error(mock_credential_class):
     """Test token acquisition fails with authentication error."""
     from azure.core.exceptions import ClientAuthenticationError
@@ -74,7 +74,7 @@ def test_acquire_token_authentication_error(mock_credential_class):
     assert "Managed identity authentication failed" in str(exc_info.value)
 
 
-@patch("src.oauth_providers.managed_identity.DefaultAzureCredential")
+@patch("azure.identity.DefaultAzureCredential")
 def test_acquire_token_empty_token(mock_credential_class):
     """Test token acquisition fails when token is empty."""
     # Setup mock to return None token
