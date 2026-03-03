@@ -25,13 +25,13 @@ jobs:
       - name: Check current complexity
         id: current
         run: |
-          echo "average=$(radon cc src/ -a --total-average | grep 'Average complexity' | awk '{print $3}')" >> $GITHUB_OUTPUT
+          echo "average=$(radon cc src/ -a --total-average | grep 'Average complexity' | awk '{print $4}' | tr -d '()')" >> $GITHUB_OUTPUT
 
       - name: Check baseline (main branch)
         if: github.event_name == 'pull_request'
         run: |
           git checkout origin/main
-          BASELINE=$(radon cc src/ -a --total-average | grep 'Average complexity' | awk '{print $3}')
+          BASELINE=$(radon cc src/ -a --total-average | grep 'Average complexity' | awk '{print $4}' | tr -d '()')
           echo "Baseline complexity: $BASELINE"
           echo "baseline=$BASELINE" >> $GITHUB_ENV
 
