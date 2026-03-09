@@ -12,7 +12,7 @@ bandit==1.9.3
 isort==5.13.2
 types-requests==2.31.0.20240106
 types-PyJWT==1.7.1
-pylint==3.0.3
+pylint==4.0.4
 radon==6.0.1
 vulture==2.11
 pydocstyle==6.3.0
