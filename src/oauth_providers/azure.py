@@ -1,5 +1,9 @@
 """Azure Active Directory (Entra ID) OAuth provider."""
+import logging
 from typing import TYPE_CHECKING, Any, Dict, Optional
+
+import jwt as pyjwt
+from jwt.exceptions import InvalidTokenError
 
 from src.jwt_validator import JWTValidator
 from src.oauth_providers.base import OAuthConfig, OAuthProvider
@@ -8,6 +12,8 @@ from src.structured_logger import structured_logger
 
 if TYPE_CHECKING:
     from src.http_client import HttpClient
+
+logger = logging.getLogger(__name__)
 
 
 class AzureOAuthProvider(GenericOAuth2Provider):
@@ -37,9 +43,6 @@ class AzureOAuthProvider(GenericOAuth2Provider):
         # Support both Dict and OAuthConfig
         if isinstance(config, dict):
             tenant_id = tenant_id or config.get("TenantId", "common")
-            # Call parent with dict config (GenericOAuth2Provider handles conversion)
-            # But we need to bypass parent's __init__ to avoid double init
-            # So we'll duplicate the logic here
             oauth_config = OAuthConfig(
                 token_endpoint=config["TokenEndpoint"],
                 client_id=config["ClientId"],
@@ -51,14 +54,28 @@ class AzureOAuthProvider(GenericOAuth2Provider):
             oauth_config = config
             tenant_id = tenant_id or "common"
 
-        # Call OAuthProvider.__init__ directly
-        OAuthProvider.__init__(self, oauth_config, http_client)
+        # Call GenericOAuth2Provider with OAuthConfig (not dict) to avoid
+        # duplicating dict→OAuthConfig conversion logic
+        super().__init__(oauth_config, http_client)
 
         self.tenant_id = tenant_id
         self.jwks_uri = (
             f"https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys"
         )
         self.issuer = f"https://login.microsoftonline.com/{tenant_id}/v2.0"
+
+        # Derive audience from scope: strip /.default suffix for aud validation
+        self._expected_audience: Optional[str] = None
+        scope = oauth_config.scope
+        if scope and scope.endswith("/.default"):
+            self._expected_audience = scope.rsplit("/.default", 1)[0]
+
+        # Check if JWT validation is explicitly disabled in config
+        self._jwt_validation_disabled = False
+        if isinstance(config, dict):
+            self._jwt_validation_disabled = config.get(
+                "DisableJWTValidation", False
+            )
 
         # Initialize JWT validator for Azure
         if isinstance(config, dict):
@@ -80,17 +97,89 @@ class AzureOAuthProvider(GenericOAuth2Provider):
                     audience=jwt_audience,
                     issuer=jwt_issuer,
                 )
-        else:
-            # No JWT validator for OAuthConfig-based init
-            self.jwt_validator = JWTValidator(public_key=None)
+
+        # P6: Warn when defaulting to 'common' tenant
+        if tenant_id == "common":
+            structured_logger.warning(
+                "Azure OAuth using multi-tenant 'common' endpoint. "
+                "Healthcare deployments should specify a tenant_id for "
+                "tenant-specific token validation.",
+                provider=self.provider_name,
+                tenant_id=tenant_id,
+            )
 
     @property
     def provider_name(self) -> str:
         return "azure-ad"
 
     def validate_token(self, token: str) -> bool:
-        """Validate JWT signature using Azure's JWKS."""
-        # TODO: Fix validation for client credentials flow tokens
-        # Current issue: Audience and issuer validation may not match
-        # For now, skip validation to enable OAuth flow
-        return True
+        """
+        Validate JWT signature using Azure's JWKS.
+
+        For client credentials flow tokens:
+        - aud is set to the resource URL (e.g. https://dicom.healthcareapis.azure.com)
+        - iss is the tenant-specific URL
+        - Validates token is not expired
+
+        Falls back to True if JWT validation is explicitly disabled.
+        """
+        # If JWT validation is explicitly disabled, skip
+        if self._jwt_validation_disabled:
+            structured_logger.debug(
+                "JWT validation explicitly disabled",
+                provider=self.provider_name,
+            )
+            return True
+
+        # If a static JWTPublicKey was provided, use the existing JWTValidator
+        if hasattr(self, "jwt_validator") and self.jwt_validator.enabled:
+            result: bool = self.jwt_validator.validate(token)
+            return result
+
+        # Attempt JWKS-based validation from Azure endpoint
+        try:
+            jwks_client = pyjwt.PyJWKClient(self.jwks_uri)
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+
+            decode_options = {
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_nbf": True,
+                "verify_aud": self._expected_audience is not None,
+                "verify_iss": True,
+            }
+
+            pyjwt.decode(
+                token,
+                key=signing_key.key,
+                algorithms=["RS256"],
+                audience=self._expected_audience,
+                issuer=self.issuer,
+                options=decode_options,
+            )
+
+            structured_logger.debug(
+                "Azure JWT validation successful",
+                provider=self.provider_name,
+                issuer=self.issuer,
+                audience=self._expected_audience,
+            )
+            return True
+
+        except InvalidTokenError as e:
+            structured_logger.warning(
+                "Azure JWT validation failed",
+                provider=self.provider_name,
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
+            return False
+
+        except Exception as e:
+            structured_logger.error(
+                "Unexpected error during Azure JWT validation",
+                provider=self.provider_name,
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
+            return False

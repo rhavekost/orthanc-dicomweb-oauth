@@ -1,3 +1,6 @@
+import threading
+from unittest.mock import Mock, patch
+
 import pytest
 import responses
 
@@ -282,3 +285,86 @@ def test_token_manager_cache_shares_across_instances() -> None:
     token2 = manager2.get_token()
     assert token2 == "shared_token_456"
     assert len(responses.calls) == 1  # Still only 1 call - cache hit!
+
+
+@responses.activate  # type: ignore[misc]
+def test_concurrent_get_token_no_thundering_herd() -> None:
+    """Test that concurrent get_token calls don't all fetch tokens."""
+    import time
+
+    call_count = 0
+    original_post = responses.calls
+
+    # Simulate a slow token endpoint
+    def slow_token_callback(request):
+        nonlocal call_count
+        call_count += 1
+        time.sleep(0.1)  # Simulate network latency
+        return (
+            200,
+            {},
+            '{"access_token": "concurrent_token", "token_type": "Bearer", "expires_in": 3600}',
+        )
+
+    responses.add_callback(
+        responses.POST,
+        "https://login.example.com/oauth2/token",
+        callback=slow_token_callback,
+    )
+
+    config = {
+        "TokenEndpoint": "https://login.example.com/oauth2/token",
+        "ClientId": "client123",
+        "ClientSecret": "secret456",
+        "Scope": "scope",
+    }
+
+    manager = TokenManager("test-server", config)
+    results = []
+    errors = []
+
+    def get_token_thread():
+        try:
+            token = manager.get_token()
+            results.append(token)
+        except Exception as e:
+            errors.append(e)
+
+    # Launch multiple threads concurrently
+    threads = [threading.Thread(target=get_token_thread) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert not errors, f"Unexpected errors: {errors}"
+    assert all(r == "concurrent_token" for r in results)
+    # Only 1 actual HTTP call should be made (first caller fetches,
+    # others wait on condition)
+    assert call_count == 1
+
+
+@responses.activate  # type: ignore[misc]
+def test_token_pending_flag_cleared_on_failure() -> None:
+    """Test that _token_pending is cleared even if acquisition fails."""
+    responses.add(
+        responses.POST,
+        "https://login.example.com/oauth2/token",
+        json={"error": "server_error"},
+        status=500,
+    )
+
+    config = {
+        "TokenEndpoint": "https://login.example.com/oauth2/token",
+        "ClientId": "client123",
+        "ClientSecret": "secret456",
+        "Scope": "scope",
+    }
+
+    manager = TokenManager("test-server", config)
+
+    with pytest.raises(TokenAcquisitionError):
+        manager.get_token()
+
+    # Pending flag must be cleared so next caller can attempt
+    assert manager._token_pending is False

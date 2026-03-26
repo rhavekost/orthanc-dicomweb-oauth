@@ -1,6 +1,6 @@
 """Tests for Azure Active Directory (Entra ID) OAuth provider."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from src.http_client import HttpClient, HttpResponse
 from src.oauth_providers.azure import AzureOAuthProvider
@@ -116,8 +116,26 @@ def test_azure_provider_initialization_with_oauth_config() -> None:
     assert provider.jwt_validator.enabled is False
 
 
-def test_azure_provider_validate_token_always_returns_true() -> None:
-    """Test that validate_token returns True (validation disabled)."""
+def test_azure_provider_validate_token_disabled_explicitly() -> None:
+    """Test that validate_token returns True when DisableJWTValidation is set."""
+    config = {
+        "TokenEndpoint": (
+            "https://login.microsoftonline.com/" "tenant123/oauth2/v2.0/token"
+        ),
+        "TenantId": "tenant123",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+        "DisableJWTValidation": True,
+    }
+
+    provider = AzureOAuthProvider(config)
+
+    assert provider.validate_token("any_token") is True
+    assert provider.validate_token("") is True
+
+
+def test_azure_provider_validate_token_rejects_invalid_jwt() -> None:
+    """Test that validate_token rejects invalid JWT strings."""
     config = {
         "TokenEndpoint": (
             "https://login.microsoftonline.com/" "tenant123/oauth2/v2.0/token"
@@ -129,10 +147,115 @@ def test_azure_provider_validate_token_always_returns_true() -> None:
 
     provider = AzureOAuthProvider(config)
 
-    # TODO: This should be fixed to properly validate tokens
-    # For now, it always returns True
-    assert provider.validate_token("any_token") is True
-    assert provider.validate_token("") is True
+    # Invalid JWT should fail validation (JWKS fetch will fail for invalid token)
+    assert provider.validate_token("not_a_valid_jwt") is False
+
+
+def test_azure_provider_validate_token_with_jwks(
+) -> None:
+    """Test that validate_token uses JWKS endpoint for validation."""
+    import jwt as pyjwt
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+
+    # Generate test RSA key pair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+
+    config = {
+        "TokenEndpoint": (
+            "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token"
+        ),
+        "TenantId": "tenant123",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
+    }
+
+    provider = AzureOAuthProvider(config)
+
+    # Create a valid JWT signed with our test key
+    token = pyjwt.encode(
+        {
+            "iss": "https://login.microsoftonline.com/tenant123/v2.0",
+            "aud": "https://dicom.healthcareapis.azure.com",
+            "exp": 9999999999,
+            "iat": 1000000000,
+        },
+        private_key,
+        algorithm="RS256",
+        headers={"kid": "test-key-id"},
+    )
+
+    # Mock PyJWKClient to return our test key
+    mock_jwk = Mock()
+    mock_jwk.key = public_key
+
+    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient") as mock_client_cls:
+        mock_client = Mock()
+        mock_client.get_signing_key_from_jwt.return_value = mock_jwk
+        mock_client_cls.return_value = mock_client
+
+        result = provider.validate_token(token)
+
+    assert result is True
+    mock_client_cls.assert_called_once_with(provider.jwks_uri)
+
+
+def test_azure_provider_audience_from_scope() -> None:
+    """Test audience is derived from scope by stripping /.default."""
+    config = {
+        "TokenEndpoint": (
+            "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token"
+        ),
+        "TenantId": "tenant123",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
+    }
+
+    provider = AzureOAuthProvider(config)
+    assert provider._expected_audience == "https://dicom.healthcareapis.azure.com"
+
+
+def test_azure_provider_common_tenant_logs_warning() -> None:
+    """Test that defaulting to 'common' tenant logs a warning."""
+    config = {
+        "TokenEndpoint": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+    }
+
+    with patch("src.oauth_providers.azure.structured_logger") as mock_logger:
+        provider = AzureOAuthProvider(config)
+
+    assert provider.tenant_id == "common"
+    mock_logger.warning.assert_called()
+    warning_msg = mock_logger.warning.call_args[0][0]
+    assert "common" in warning_msg
+    assert "tenant_id" in warning_msg or "tenant" in warning_msg.lower()
+
+
+def test_azure_provider_specific_tenant_no_warning() -> None:
+    """Test that specific tenant_id does not log a warning."""
+    config = {
+        "TokenEndpoint": (
+            "https://login.microsoftonline.com/my-tenant/oauth2/v2.0/token"
+        ),
+        "TenantId": "my-tenant",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+    }
+
+    with patch("src.oauth_providers.azure.structured_logger") as mock_logger:
+        provider = AzureOAuthProvider(config)
+
+    assert provider.tenant_id == "my-tenant"
+    # Warning should not have been called (info calls from JWT setup are ok)
+    mock_logger.warning.assert_not_called()
 
 
 def test_azure_provider_inherits_generic_acquire_token() -> None:

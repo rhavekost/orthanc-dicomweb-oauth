@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Lock contention in TokenManager** - `get_token()` no longer holds the lock during network calls; uses a Condition variable pattern so the first caller fetches while others wait, preventing thundering herd on token expiry
+- **Near-expired token edge case** - `AzureManagedIdentityProvider.acquire_token()` now rejects tokens expiring within 60 seconds instead of caching already-expired tokens
+- **Duplicate token acquisition logic** - Extracted shared cache-write, validation, and logging into `_attempt_acquire()`, eliminating duplication between retry paths
+- **Azure JWT validation** - `AzureOAuthProvider.validate_token()` now validates tokens via Azure JWKS endpoint (RS256), checking issuer, audience (resource URL from scope), and expiration; falls back to permissive mode only when `DisableJWTValidation` is set
+- **Azure provider inheritance** - `AzureOAuthProvider` now calls `super().__init__()` through `GenericOAuth2Provider` instead of bypassing it with a direct `OAuthProvider.__init__()` call
+- **Silent tenant_id default** - Azure provider now logs a structured warning when defaulting to the multi-tenant 'common' endpoint, as healthcare deployments should use a specific tenant
+
 ## [2.1.0] - 2026-02-07
 
 ### Added

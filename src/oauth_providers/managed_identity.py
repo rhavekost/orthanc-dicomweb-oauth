@@ -107,6 +107,14 @@ class AzureManagedIdentityProvider(OAuthProvider):
                 # Calculate expires_in from expires_on timestamp
                 expires_in = max(0, int(token.expires_on - time.time()))
 
+                if expires_in < 60:
+                    raise TokenAcquisitionError(
+                        error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
+                        message=(
+                            "Managed identity returned token expiring too soon"
+                        ),
+                    )
+
                 return OAuthToken(
                     access_token=token.token,
                     expires_in=expires_in,
