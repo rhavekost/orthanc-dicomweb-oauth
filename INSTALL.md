@@ -14,6 +14,8 @@
 pip install -r requirements.txt
 ```
 
+Run this from the directory where you extracted the plugin zip.
+
 ### 2. Copy plugin files to your Orthanc plugins directory
 
 ```bash
@@ -22,7 +24,7 @@ cp -r schemas/ /etc/orthanc/plugins/
 ```
 
 The default plugins directory is `/etc/orthanc/plugins/` on Linux.
-Check your `orthanc.json` → `"PluginsExplorer"` for the actual path on your system.
+Check your `orthanc.json` → `"PluginsDirectory"` for the actual path on your system.
 
 ### 3. Add to your orthanc.json
 
