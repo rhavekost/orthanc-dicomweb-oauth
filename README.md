@@ -151,41 +151,77 @@ cd examples/azure/production
 
 ## Quick Start
 
-### Docker (Recommended)
+### Option 1: Docker (New Orthanc Installation)
 
-1. **Clone and configure:**
-   ```bash
-   git clone https://github.com/yourusername/orthanc-dicomweb-oauth.git
-   cd orthanc-dicomweb-oauth/docker
-   cp .env.example .env
-   # Edit .env with your OAuth credentials
-   ```
+Pull the standalone image from Docker Hub — includes Orthanc + plugin ready to run:
 
-2. **Start Orthanc:**
-   ```bash
-   docker-compose up -d
-   ```
+```bash
+docker run -d \
+  -p 8042:8042 -p 4242:4242 \
+  -e OAUTH_CLIENT_ID=your-client-id \
+  -e OAUTH_CLIENT_SECRET=your-client-secret \
+  rhavekost/orthanc-dicomweb-oauth:latest
+```
 
-3. **Test the connection:**
-   ```bash
-   curl http://localhost:8042/dicomweb-oauth/status
-   ```
+Or mount your own `orthanc.json` for full configuration:
 
-### Manual Installation
+```bash
+docker run -d \
+  -p 8042:8042 -p 4242:4242 \
+  -v /path/to/orthanc.json:/etc/orthanc/orthanc.json \
+  rhavekost/orthanc-dicomweb-oauth:latest
+```
 
-1. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Option 2: Add to Existing Orthanc Docker Setup
 
-2. **Copy plugin files to Orthanc:**
-   ```bash
-   cp -r src/* /etc/orthanc/plugins/
-   ```
+Use the plugin-only image to layer the plugin into your existing Orthanc Dockerfile:
 
-3. **Configure Orthanc** (see [Configuration](#configuration))
+```dockerfile
+FROM your-existing-orthanc-image
 
-4. **Restart Orthanc**
+# Copy plugin files from the plugin-only image
+COPY --from=rhavekost/orthanc-dicomweb-oauth:latest-plugin /plugin/src /etc/orthanc/plugins/src/
+COPY --from=rhavekost/orthanc-dicomweb-oauth:latest-plugin /plugin/schemas /etc/orthanc/plugins/schemas/
+
+ENV PYTHONPATH=/etc/orthanc/plugins
+```
+
+Or with Docker Compose, use an init container pattern:
+
+```yaml
+services:
+  orthanc:
+    image: jodogne/orthanc-python:latest
+    volumes:
+      - plugin-files:/etc/orthanc/plugins/plugin
+    depends_on:
+      plugin-init:
+        condition: service_completed_successfully
+
+  plugin-init:
+    image: rhavekost/orthanc-dicomweb-oauth:latest-plugin
+    command: ["sh", "-c", "cp -r /plugin/. /target/"]
+    volumes:
+      - plugin-files:/target
+
+volumes:
+  plugin-files:
+```
+
+### Option 3: Manual Install (Bare Metal)
+
+1. Download the latest release zip from [GitHub Releases](https://github.com/rhavekost/orthanc-dicomweb-oauth/releases)
+2. Extract and follow [INSTALL.md](INSTALL.md)
+
+### Option 4: Clone and Build
+
+```bash
+git clone https://github.com/rhavekost/orthanc-dicomweb-oauth.git
+cd orthanc-dicomweb-oauth/docker
+cp .env.example .env
+# Edit .env with your OAuth credentials
+docker-compose up -d
+```
 
 ## Configuration
 
