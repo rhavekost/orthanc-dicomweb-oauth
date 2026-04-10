@@ -35,3 +35,31 @@ jobs:
           docker run --rm --entrypoint python3 orthanc-dicomweb-oauth:ci-test -c "import requests; print('Dependencies OK')"
           docker run --rm --entrypoint ls orthanc-dicomweb-oauth:ci-test -la /etc/orthanc/plugins/
           echo "Docker image validation passed"
+
+  build-plugin:
+    name: Build and Test Plugin-Only Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build plugin-only image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.plugin
+          push: false
+          load: true
+          tags: orthanc-dicomweb-oauth:ci-plugin-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Test plugin-only image
+        run: |
+          docker run --rm orthanc-dicomweb-oauth:ci-plugin-test sh -c "ls /plugin/src/ && ls /plugin/schemas/ && test -f /plugin/requirements.txt"
+          echo "Plugin image validation passed"
