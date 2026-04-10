@@ -10,8 +10,8 @@ Enables Orthanc to transparently connect to OAuth2-protected DICOMweb servers th
 ## Features
 
 ### Core OAuth2 Features
-✅ **Generic OAuth2** - Works with any OAuth2/OIDC provider (Azure, Google Cloud, Keycloak, Auth0, Okta, etc.)
-✅ **Specialized Providers** - Built-in support for Azure Entra ID, Google Cloud Healthcare API, AWS HealthImaging
+✅ **Generic OAuth2** - Designed to work with any OAuth2/OIDC provider; verified with Azure
+✅ **Specialized Providers** - Built-in provider modules for Azure Entra ID (verified), Google Cloud Healthcare API, and AWS HealthImaging (both unverified)
 ✅ **Provider Auto-Detection** - Automatically detects provider type from token endpoint URL
 ✅ **Automatic Token Refresh** - Proactive refresh before expiration (configurable buffer)
 ✅ **Zero-Downtime** - Thread-safe token caching, no interruption to DICOMweb operations
@@ -63,8 +63,9 @@ This plugin enables seamless integration with OAuth-protected DICOMweb endpoints
 ### Verified Working With
 
 - ✅ **Azure Health Data Services DICOM** - Full transparent integration (client credentials and managed identity)
-- 🔬 **Google Cloud Healthcare API** - Implemented but not yet verified in production
-- 🔄 **Other OAuth2 providers** - Should work, needs testing
+- 🔬 **Google Cloud Healthcare API** - Code implemented, not yet tested
+- 🔬 **AWS HealthImaging** - Code implemented, not yet tested
+- 🔬 **Other OAuth2 providers** - Code implemented, not yet tested
 
 ### Example Configuration
 
@@ -118,10 +119,10 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 Orthanc's built-in DICOMweb plugin only supports HTTP Basic auth or static headers, which prevents integration with modern cloud DICOM services that require OAuth2. This plugin bridges that gap by handling OAuth2 authentication transparently, enabling Orthanc users to send studies to cloud providers through the standard UI:
 
-- **Azure Health Data Services** (Microsoft Entra ID OAuth2) - Specialized provider with auto-detection
-- **Google Cloud Healthcare API** - Specialized provider with auto-detection
-- **AWS HealthImaging** (OAuth2) - Basic support (full SigV4 pending)
-- **Any DICOMweb server behind Keycloak, Auth0, Okta, etc.** - Generic OAuth2 support
+- **Azure Health Data Services** (Microsoft Entra ID OAuth2) - Verified working
+- **Google Cloud Healthcare API** - Code implemented, not yet tested
+- **AWS HealthImaging** - Code implemented, not yet tested
+- **Any DICOMweb server behind Keycloak, Auth0, Okta, etc.** - Code implemented, not yet tested
 
 ## Deployment Options
 

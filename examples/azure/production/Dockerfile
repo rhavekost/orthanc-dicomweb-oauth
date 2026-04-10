@@ -22,8 +22,8 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install --no-cache-dir --break-system-packages azure-identity>=1.15.0
 
 # Copy plugin files from the published Docker Hub image
-COPY --from=rhavekost/orthanc-dicomweb-oauth:2.2.0-plugin /plugin/src /etc/orthanc/plugins/src/
-COPY --from=rhavekost/orthanc-dicomweb-oauth:2.2.0-plugin /plugin/schemas /etc/orthanc/plugins/schemas/
+COPY --from=rhavekost/orthanc-dicomweb-oauth:2.2.1-plugin /plugin/src /etc/orthanc/plugins/src/
+COPY --from=rhavekost/orthanc-dicomweb-oauth:2.2.1-plugin /plugin/schemas /etc/orthanc/plugins/schemas/
 
 # Set Python path to include plugin directory
 ENV PYTHONPATH=/etc/orthanc/plugins
