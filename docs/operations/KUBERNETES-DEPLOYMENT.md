@@ -32,6 +32,46 @@ This guide provides best practices and examples for deploying Orthanc with OAuth
 
 ## Deployment Methods
 
+### Using the Plugin-Only Image (Recommended)
+
+Instead of building a custom Docker image that bundles the plugin, use the published plugin-only image as an init container. This allows you to use any standard Orthanc image and keep the plugin decoupled from your base image.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orthanc
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: plugin-install
+          image: rhavekost/orthanc-dicomweb-oauth:latest-plugin
+          command: ["sh", "-c", "cp -r /plugin/. /target/"]
+          volumeMounts:
+            - name: plugin-volume
+              mountPath: /target
+
+      containers:
+        - name: orthanc
+          image: jodogne/orthanc-python:latest
+          env:
+            - name: PYTHONPATH
+              value: /etc/orthanc/plugins
+          volumeMounts:
+            - name: plugin-volume
+              mountPath: /etc/orthanc/plugins/plugin
+
+      volumes:
+        - name: plugin-volume
+          emptyDir: {}
+```
+
+Pin to a specific version in production instead of `latest-plugin`:
+```yaml
+image: rhavekost/orthanc-dicomweb-oauth:2.1.0-plugin
+```
+
 ### Method 1: Helm Chart (Recommended)
 
 **Install:**
