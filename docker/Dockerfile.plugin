@@ -13,8 +13,8 @@ COPY src/ ./src/
 COPY schemas/ ./schemas/
 COPY requirements.txt ./
 
-# Final stage: just the files, no runtime
-FROM scratch
+# Final stage: alpine so init containers can run sh/cp commands
+FROM alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
 LABEL org.opencontainers.image.title="orthanc-dicomweb-oauth plugin files" \
       org.opencontainers.image.description="Plugin-only distribution image. Use COPY --from= to install into your Orthanc container." \
       org.opencontainers.image.source="https://github.com/rhavekost/orthanc-dicomweb-oauth"
