@@ -137,9 +137,10 @@ Look for:
 
 **CRITICAL for Azure deployment from Mac:**
 ```bash
+# Run from inside examples/azure/quickstart/
 docker buildx build \
   --platform linux/amd64 \
-  -f examples/azure/quickstart/Dockerfile \
+  -f Dockerfile \
   -t registry/image:tag \
   --push .
 ```

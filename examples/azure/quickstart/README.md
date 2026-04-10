@@ -178,10 +178,12 @@ This validates:
 **IMPORTANT:** When building for Azure Container Apps, you MUST specify the target platform:
 
 ```bash
-docker buildx build --platform linux/amd64 -t <registry>/<image>:<tag> -f examples/azure/quickstart/Dockerfile .
+# Run from inside examples/azure/quickstart/
+docker buildx build --platform linux/amd64 -t <registry>/<image>:<tag> -f Dockerfile .
 ```
 
 M1/M2/M3 Macs build arm64 images by default, which will fail on Azure Container Apps (amd64 Linux).
+Plugin files are pulled automatically from Docker Hub — no repo root build context needed.
 
 ## Cost Estimate
 

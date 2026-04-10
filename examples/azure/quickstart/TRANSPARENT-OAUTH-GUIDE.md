@@ -144,9 +144,10 @@ The proxy URL must point to localhost (internal):
 **CRITICAL**: Must build for linux/amd64 when deploying to Azure from Mac:
 
 ```bash
+# Run from inside examples/azure/quickstart/
 docker buildx build \
   --platform linux/amd64 \
-  -f examples/azure/quickstart/Dockerfile \
+  -f Dockerfile \
   -t {registry}/{image}:{tag} \
   --push .
 ```

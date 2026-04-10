@@ -39,9 +39,8 @@ Production-ready deployment with VNet isolation, private endpoints, and managed 
 ### Quick Start
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/orthanc-dicomweb-oauth.git
-cd orthanc-dicomweb-oauth/examples/azure/production
+# Navigate to this directory (no full repo clone required)
+cd examples/azure/production
 
 # Deploy
 ./deploy.sh
