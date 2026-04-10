@@ -149,7 +149,7 @@ livenessProbe:
 ```yaml
 readinessProbe:
   httpGet:
-    path: /plugins/oauth/status
+    path: /dicomweb-oauth/status
     port: 8042
   initialDelaySeconds: 10
   periodSeconds: 5
@@ -410,7 +410,7 @@ spec:
       app: orthanc-oauth
   endpoints:
   - port: metrics
-    path: /plugins/oauth/metrics
+    path: /dicomweb-oauth/metrics
     interval: 30s
 ```
 
@@ -471,7 +471,7 @@ kubectl logs orthanc-oauth-xxx
 ### Check OAuth Status
 
 ```bash
-kubectl exec orthanc-oauth-xxx -- curl localhost:8042/plugins/oauth/status
+kubectl exec orthanc-oauth-xxx -- curl localhost:8042/dicomweb-oauth/status
 ```
 
 ### Check Redis Connection
