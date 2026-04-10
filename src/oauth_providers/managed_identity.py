@@ -2,9 +2,6 @@
 import time
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from azure.core.exceptions import ClientAuthenticationError
-from azure.identity import DefaultAzureCredential
-
 from src.error_codes import ErrorCode, TokenAcquisitionError
 from src.oauth_providers.base import OAuthConfig, OAuthProvider, OAuthToken
 from src.structured_logger import structured_logger
@@ -46,7 +43,7 @@ class AzureManagedIdentityProvider(OAuthProvider):
         # Store for convenient access
         self.scope = self.config.scope
         self.verify_ssl = self.config.verify_ssl
-        self._credential: Optional[DefaultAzureCredential] = None
+        self._credential: Optional[Any] = None
 
         structured_logger.info(
             "AzureManagedIdentityProvider initialized", scope=self.scope
@@ -58,9 +55,19 @@ class AzureManagedIdentityProvider(OAuthProvider):
         return "azure_managed_identity"
 
     @property
-    def credential(self) -> DefaultAzureCredential:
+    def credential(self) -> Any:
         """Lazy-load DefaultAzureCredential."""
         if self._credential is None:
+            try:
+                from azure.identity import DefaultAzureCredential
+            except ImportError as e:
+                raise TokenAcquisitionError(
+                    error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
+                    message=(
+                        "azure-identity package is not installed. "
+                        "Install it with: pip install azure-identity"
+                    ),
+                ) from e
             self._credential = DefaultAzureCredential()
         return self._credential
 
@@ -74,6 +81,17 @@ class AzureManagedIdentityProvider(OAuthProvider):
         Raises:
             TokenAcquisitionError: If token acquisition fails
         """
+        try:
+            from azure.core.exceptions import ClientAuthenticationError
+        except ImportError as e:
+            raise TokenAcquisitionError(
+                error_code=ErrorCode.TOKEN_ACQUISITION_FAILED,
+                message=(
+                    "azure-identity package is not installed. "
+                    "Install it with: pip install azure-identity"
+                ),
+            ) from e
+
         try:
             structured_logger.debug(
                 "Acquiring token via managed identity", scope=self.scope

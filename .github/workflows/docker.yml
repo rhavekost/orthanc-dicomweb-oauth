@@ -32,7 +32,11 @@ jobs:
 
       - name: Test Docker image
         run: |
+          # Test that the image was built and can be inspected
+          docker inspect orthanc-dicomweb-oauth:ci-test
+          # Test that Python dependencies are installed
           docker run --rm --entrypoint python3 orthanc-dicomweb-oauth:ci-test -c "import requests; print('Dependencies OK')"
+          # Test that plugin files exist
           docker run --rm --entrypoint ls orthanc-dicomweb-oauth:ci-test -la /etc/orthanc/plugins/
           echo "Docker image validation passed"
 

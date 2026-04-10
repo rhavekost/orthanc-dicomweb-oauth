@@ -10,7 +10,11 @@ RUN apt-get update && apt-get install -y \
     python3-prometheus-client \
     python3-flask-limiter \
     python3-redis \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install azure-identity (not available as apt package)
+RUN pip3 install --break-system-packages azure-identity
 
 # Copy entire src directory to maintain package structure
 COPY src/ /etc/orthanc/plugins/src/
