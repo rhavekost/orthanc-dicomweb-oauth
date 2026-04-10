@@ -1,6 +1,11 @@
 # Plugin-only image — contains plugin source files at /plugin/
-# Usage: COPY --from=rhavekost/orthanc-dicomweb-oauth:<version>-plugin /plugin /etc/orthanc/plugins/
-FROM alpine:3.19 AS plugin-files
+# Usage:
+#   COPY --from=rhavekost/orthanc-dicomweb-oauth:<version>-plugin /plugin /etc/orthanc/plugins/
+# Note: Run 'pip install -r /etc/orthanc/plugins/requirements.txt' in your Orthanc container
+#       to install required Python dependencies if not already present.
+
+# alpine:3.19.x series — pinned to digest for reproducibility
+FROM alpine@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1 AS plugin-files
 
 WORKDIR /plugin
 
@@ -10,4 +15,7 @@ COPY requirements.txt ./
 
 # Final stage: just the files, no runtime
 FROM scratch
+LABEL org.opencontainers.image.title="orthanc-dicomweb-oauth plugin files" \
+      org.opencontainers.image.description="Plugin-only distribution image. Use COPY --from= to install into your Orthanc container." \
+      org.opencontainers.image.source="https://github.com/rhavekost/orthanc-dicomweb-oauth"
 COPY --from=plugin-files /plugin /plugin
