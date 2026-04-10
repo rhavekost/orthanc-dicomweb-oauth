@@ -1,0 +1,13 @@
+# Plugin-only image — contains plugin source files at /plugin/
+# Usage: COPY --from=rhavekost/orthanc-dicomweb-oauth:<version>-plugin /plugin /etc/orthanc/plugins/
+FROM alpine:3.19 AS plugin-files
+
+WORKDIR /plugin
+
+COPY src/ ./src/
+COPY schemas/ ./schemas/
+COPY requirements.txt ./
+
+# Final stage: just the files, no runtime
+FROM scratch
+COPY --from=plugin-files /plugin /plugin
