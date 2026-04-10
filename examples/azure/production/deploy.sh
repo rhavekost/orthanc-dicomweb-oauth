@@ -185,15 +185,13 @@ az acr login --name "$ACR_NAME"
 echo "Building Docker image for linux/amd64 platform..."
 IMAGE_TAG="${ACR_LOGIN_SERVER}/orthanc-oauth:latest"
 
-# Navigate to repository root (3 levels up from script directory)
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-
+# Build context is the production directory — plugin files are pulled from Docker Hub
 docker buildx build \
   --platform linux/amd64 \
   --file "$SCRIPT_DIR/Dockerfile" \
   --tag "$IMAGE_TAG" \
   --push \
-  "$REPO_ROOT"
+  "$SCRIPT_DIR"
 
 if [ $? -ne 0 ]; then
   echo "ERROR: Docker image build and push failed"

@@ -15,20 +15,18 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy entire src directory to maintain package structure
-COPY src/ /etc/orthanc/plugins/src/
-
-# Copy schemas directory for config validation
-COPY schemas/ /etc/orthanc/plugins/schemas/
+# Copy plugin files from the published Docker Hub image
+COPY --from=rhavekost/orthanc-dicomweb-oauth:2.2.0-plugin /plugin/src /etc/orthanc/plugins/src/
+COPY --from=rhavekost/orthanc-dicomweb-oauth:2.2.0-plugin /plugin/schemas /etc/orthanc/plugins/schemas/
 
 # Set Python path to include plugin directory
 ENV PYTHONPATH=/etc/orthanc/plugins
 
 # Copy Orthanc configuration as template (will be processed at runtime)
-COPY examples/azure/quickstart/orthanc.json /etc/orthanc/orthanc.json.template
+COPY orthanc.json /etc/orthanc/orthanc.json.template
 
 # Copy and make entrypoint script executable
-COPY examples/azure/quickstart/docker-entrypoint.sh /usr/local/bin/custom-entrypoint.sh
+COPY docker-entrypoint.sh /usr/local/bin/custom-entrypoint.sh
 RUN chmod +x /usr/local/bin/custom-entrypoint.sh
 
 # Enable required plugins via symlinks (orthancteam pattern)

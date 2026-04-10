@@ -1,4 +1,8 @@
 # .dockerignore
+# Plugin source files are pulled from the published Docker Hub image at build time;
+# they are not needed in the local build context.
+src/
+schemas/
 *.md
 .git
 .gitignore

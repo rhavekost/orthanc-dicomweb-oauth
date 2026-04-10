@@ -224,17 +224,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Navigate to project root
-PROJECT_ROOT="$SCRIPT_DIR/../../.."
-cd "$PROJECT_ROOT"
-
 # Build with explicit platform for Azure deployment
+# Build context is the quickstart directory — plugin files are pulled from Docker Hub
 docker buildx build \
     --platform linux/amd64 \
     -t "$CONTAINER_IMAGE" \
-    -f examples/azure/quickstart/Dockerfile \
+    -f "$SCRIPT_DIR/Dockerfile" \
     --push \
-    .
+    "$SCRIPT_DIR"
 
 if [ $? -ne 0 ]; then
     echo "ERROR: Docker build failed"
@@ -243,9 +240,6 @@ fi
 
 echo "✓ Docker image built and pushed"
 echo ""
-
-# Return to script directory
-cd "$SCRIPT_DIR"
 
 # ============================================================================
 # Step 7: Deploy Container App (Phase 2)
