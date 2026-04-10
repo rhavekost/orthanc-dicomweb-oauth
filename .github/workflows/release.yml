@@ -25,7 +25,8 @@ jobs:
       - name: Create release zip
         run: |
           mkdir -p release-artifact/orthanc-dicomweb-oauth-${{ steps.version.outputs.VERSION }}
-          cp -r src/ release-artifact/orthanc-dicomweb-oauth-${{ steps.version.outputs.VERSION }}/src/
+          rsync -av --exclude='__pycache__' --exclude='*.pyc' --exclude='*.pyo' --exclude='*.egg-info' \
+            src/ release-artifact/orthanc-dicomweb-oauth-${{ steps.version.outputs.VERSION }}/src/
           cp -r schemas/ release-artifact/orthanc-dicomweb-oauth-${{ steps.version.outputs.VERSION }}/schemas/
           cp requirements.txt release-artifact/orthanc-dicomweb-oauth-${{ steps.version.outputs.VERSION }}/
           cp INSTALL.md release-artifact/orthanc-dicomweb-oauth-${{ steps.version.outputs.VERSION }}/
@@ -69,6 +70,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+            type=raw,value=latest
 
       - name: Build and push plugin-only image
         uses: docker/build-push-action@v5
