@@ -226,6 +226,19 @@ OAuth2 scope parameter. Specifies what permissions/resources the token should ha
 - Custom: Space-separated list (e.g., `"dicomweb read write"`)
 - Empty: `""` if scope not required
 
+**Azure `/.default` Requirement:**
+
+For the `azure-ad` provider, the scope **must** end in `/.default` to enable JWT audience verification. The plugin derives the expected `aud` claim by stripping the `/.default` suffix (e.g., `https://dicom.healthcareapis.azure.com/.default` → audience `https://dicom.healthcareapis.azure.com`).
+
+If the scope does not end in `/.default`, audience verification is **skipped** and a warning is logged at startup:
+
+```
+Azure JWT audience verification is disabled because Scope does not end in '/.default'.
+Tokens for any Azure resource will pass validation.
+```
+
+This means tokens issued for unrelated Azure resources (e.g., Microsoft Graph) would pass validation. Always use a `/.default` scope in production Azure deployments.
+
 ### TokenRefreshBufferSeconds
 
 **Type:** integer

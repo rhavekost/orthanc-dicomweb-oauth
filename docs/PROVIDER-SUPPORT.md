@@ -118,6 +118,12 @@ This plugin supports multiple OAuth2 providers through both specialized provider
    - Only `Url`, `ProviderType`, and `Scope` are needed
    - No secrets to manage or rotate
 
+**Token Expiration Guard:**
+
+The managed identity provider rejects tokens that expire within **60 seconds** of the current time, even if the token has not technically expired yet. This prevents a race condition where a nearly-expired token is cached and then expires before the DICOMweb request completes.
+
+Tokens in this near-expiry window are treated as expired and a fresh token is fetched immediately.
+
 **Advantages over Client Credentials:**
 - Zero secrets to manage, store, or rotate
 - No risk of credential leakage
