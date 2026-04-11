@@ -83,7 +83,7 @@ The following individuals have agreed to this CLA:
 
 | Name | GitHub Username | Date | PR |
 |------|-----------------|------|-----|
-| Ryan Havekost | @rhavekost | 2026-02-07 | Initial |
+| Rob Havekost | @rhavekost | 2026-02-07 | Initial |
 | | | | |
 
 ---

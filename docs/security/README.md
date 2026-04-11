@@ -328,4 +328,4 @@ Use this checklist for production deployments:
 
 ## License
 
-Copyright © 2026. All rights reserved.
+Copyright © 2026 Rob Havekost. All rights reserved.

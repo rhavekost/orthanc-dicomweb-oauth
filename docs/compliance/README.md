@@ -392,4 +392,4 @@ A: Consult legal counsel and conduct a risk assessment. Document the analysis ev
 
 This compliance documentation is provided for informational purposes only and does not constitute legal advice. Consult with qualified legal counsel for guidance on HIPAA compliance specific to your organization.
 
-Copyright © 2026. All rights reserved.
+Copyright © 2026 Rob Havekost. All rights reserved.
