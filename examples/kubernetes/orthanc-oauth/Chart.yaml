@@ -14,5 +14,5 @@ home: https://github.com/rhavekost/orthanc-dicomweb-oauth
 sources:
   - https://github.com/rhavekost/orthanc-dicomweb-oauth
 maintainers:
-  - name: rhavekost
+  - name: Rob Havekost
     url: https://github.com/rhavekost
