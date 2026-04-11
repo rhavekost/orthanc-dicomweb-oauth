@@ -79,6 +79,8 @@ class TokenManager:
         self._encrypted_cached_token: Optional[bytes] = None
         self._token_expiry: Optional[datetime] = None
         self._lock = threading.Lock()
+        self._token_pending = False
+        self._token_condition = threading.Condition(self._lock)
 
         # Configuration
         self.scope = config.get("Scope", "")
@@ -229,12 +231,73 @@ class TokenManager:
             ),
         )
 
+    def _check_caches(self) -> Optional[str]:
+        """
+        Check distributed and local caches for a valid token.
+
+        Must be called with self._lock held.
+
+        Returns:
+            Cached token string if valid, None otherwise
+        """
+        metrics = MetricsCollector.get_instance()
+        cache_key = f"token:{self.server_name}"
+
+        # First, check distributed cache
+        cached_data = self._cache.get(cache_key)
+        if cached_data is not None:
+            expires_at = cached_data.get("expires_at")
+            if expires_at:
+                now = datetime.now(timezone.utc).timestamp()
+                buffer_seconds = self.refresh_buffer_seconds
+                if now + buffer_seconds < expires_at:
+                    metrics.record_cache_hit(self.server_name)
+
+                    structured_logger.debug(
+                        "Using distributed cached token",
+                        server=self.server_name,
+                        operation="get_token",
+                        cached=True,
+                        cache_type="distributed",
+                    )
+                    logger.debug(
+                        f"Using distributed cached token "
+                        f"for server '{self.server_name}'"
+                    )
+
+                    access_token: str = cached_data["access_token"]
+                    return access_token
+
+        # Second, check local encrypted cache (backward compatibility)
+        if self._is_token_valid():
+            metrics.record_cache_hit(self.server_name)
+
+            structured_logger.debug(
+                "Using local cached token",
+                server=self.server_name,
+                operation="get_token",
+                cached=True,
+                cache_type="local",
+            )
+            logger.debug(f"Using local cached token for server '{self.server_name}'")
+
+            cached_token = self._get_cached_token()
+            assert cached_token is not None  # Validated by _is_token_valid
+            return cached_token
+
+        return None
+
     def get_token(self) -> str:
         """
         Get a valid OAuth2 access token, acquiring or refreshing as needed.
 
         First checks distributed cache, then falls back to local cache,
         and finally acquires a new token if needed.
+
+        Uses a Condition variable pattern to avoid lock contention during
+        token acquisition: the first caller fetches the token while
+        subsequent callers wait on the condition rather than blocking
+        on the lock for the entire network call.
 
         Returns:
             Valid access token string
@@ -243,61 +306,43 @@ class TokenManager:
             TokenAcquisitionError: If token acquisition fails
         """
         metrics = MetricsCollector.get_instance()
-        cache_key = f"token:{self.server_name}"
 
-        with self._lock:
-            # First, check distributed cache
-            cached_data = self._cache.get(cache_key)
-            if cached_data is not None:
-                # Validate token is not expired (with refresh buffer)
-                expires_at = cached_data.get("expires_at")
-                if expires_at:
-                    now = datetime.now(timezone.utc).timestamp()
-                    buffer_seconds = self.refresh_buffer_seconds
-                    # Token is valid if it won't expire within the buffer window
-                    if now + buffer_seconds < expires_at:
-                        # Record cache hit
-                        metrics.record_cache_hit(self.server_name)
+        with self._token_condition:
+            # Check caches first
+            cached = self._check_caches()
+            if cached is not None:
+                return cached
 
-                        structured_logger.debug(
-                            "Using distributed cached token",
-                            server=self.server_name,
-                            operation="get_token",
-                            cached=True,
-                            cache_type="distributed",
-                        )
-                        logger.debug(
-                            f"Using distributed cached token "
-                            f"for server '{self.server_name}'"
-                        )
-
-                        access_token: str = cached_data["access_token"]
-                        return access_token
-
-            # Second, check local encrypted cache (backward compatibility)
-            if self._is_token_valid():
-                # Record cache hit
-                metrics.record_cache_hit(self.server_name)
-
+            # No cached token available. If another thread is already fetching,
+            # wait until it finishes then re-evaluate. Loop handles:
+            # (a) spurious wakeups, and
+            # (b) the case where the acquirer failed — woken threads compete
+            #     for the lock one-at-a-time; the first to see _token_pending=False
+            #     becomes the new acquirer and sets it back to True before
+            #     releasing the lock, so the rest continue waiting.
+            while self._token_pending:
                 structured_logger.debug(
-                    "Using local cached token",
+                    "Waiting for pending token acquisition",
                     server=self.server_name,
                     operation="get_token",
-                    cached=True,
-                    cache_type="local",
                 )
-                logger.debug(
-                    f"Using local cached token for server '{self.server_name}'"
-                )
+                self._token_condition.wait()
 
-                cached_token = self._get_cached_token()
-                assert cached_token is not None  # Validated by _is_token_valid
-                return cached_token
+                # Re-check cache after being notified (acquirer may have succeeded)
+                cached = self._check_caches()
+                if cached is not None:
+                    return cached
 
-            # Record cache miss
+                # Cache still empty — loop: if another woken thread already set
+                # _token_pending=True we will wait again; otherwise we exit and
+                # become the acquirer.
+
+            # We hold the lock and _token_pending is False — we are the acquirer.
             metrics.record_cache_miss(self.server_name)
+            self._token_pending = True
 
-            # Need to acquire a new token
+        # Acquire token outside the lock to avoid blocking other callers
+        try:
             structured_logger.info(
                 "Acquiring new token",
                 server=self.server_name,
@@ -305,7 +350,12 @@ class TokenManager:
                 cached=False,
             )
             logger.info(f"Acquiring new token for server '{self.server_name}'")
-            return self._acquire_token()
+            token = self._acquire_token()
+            return token
+        finally:
+            with self._token_condition:
+                self._token_pending = False
+                self._token_condition.notify_all()
 
     def _is_token_valid(self) -> bool:
         """Check if cached token exists and is not expiring soon."""
@@ -368,83 +418,105 @@ class TokenManager:
             )
             raise
 
+    def _attempt_acquire(self, **extra_log_fields: Any) -> str:
+        """
+        Core token acquisition: fetch, cache, validate, and log.
+
+        This is the shared logic called by both retry paths.
+
+        Args:
+            **extra_log_fields: Additional fields to include in log entries
+                (e.g. attempt number)
+
+        Returns:
+            Access token string
+
+        Raises:
+            TokenAcquisitionError: If token validation fails
+        """
+        cache_key = f"token:{self.server_name}"
+
+        oauth_token = self.provider.acquire_token()
+
+        # Validate BEFORE caching: an invalid token must never be written to
+        # the local or distributed cache. If we cached first and validation
+        # failed, waiting threads would wake up, hit the cache, and receive an
+        # unvalidated token without ever going through validate_token.
+        if not self.provider.validate_token(oauth_token.access_token):
+            structured_logger.security_event(
+                event_type="token_validation_failure",
+                server=self.server_name,
+                provider=self.provider.provider_name,
+                **extra_log_fields,
+            )
+
+            raise TokenAcquisitionError(
+                ErrorCode.TOKEN_VALIDATION_FAILED,
+                "Token validation failed",
+                details={
+                    "server": self.server_name,
+                    "provider": self.provider.provider_name,
+                    **extra_log_fields,
+                },
+            )
+
+        # Token is valid — write to local and distributed caches
+        self._set_cached_token(oauth_token.access_token)
+        self._token_expiry = datetime.now(timezone.utc) + timedelta(
+            seconds=oauth_token.expires_in
+        )
+
+        ttl = oauth_token.expires_in - 60  # 60s buffer before expiration
+        expires_at = datetime.now(timezone.utc).timestamp() + oauth_token.expires_in
+        self._cache.set(
+            cache_key,
+            {
+                "access_token": oauth_token.access_token,
+                "expires_at": expires_at,
+            },
+            ttl=ttl if ttl > 0 else oauth_token.expires_in,
+        )
+
+        # Log successful authentication
+        structured_logger.security_event(
+            event_type="auth_success",
+            server=self.server_name,
+            provider=self.provider.provider_name,
+            expires_in_seconds=oauth_token.expires_in,
+            **extra_log_fields,
+        )
+
+        structured_logger.info(
+            "Token acquired and validated",
+            server=self.server_name,
+            operation="acquire_token",
+            provider=self.provider.provider_name,
+            expires_in_seconds=oauth_token.expires_in,
+            **extra_log_fields,
+        )
+        logger.info(
+            f"Token acquired for server '{self.server_name}', "
+            f"expires in {oauth_token.expires_in} seconds"
+        )
+
+        cached_token = self._get_cached_token()
+        assert cached_token is not None
+        return cached_token
+
     def _acquire_with_retry_config(self) -> str:
         """Acquire token using configured retry strategy."""
         assert self._retry_config is not None
-        cache_key = f"token:{self.server_name}"
-
-        def attempt_acquire() -> str:
-            oauth_token = self.provider.acquire_token()
-
-            # Cache encrypted token locally (backward compatibility)
-            self._set_cached_token(oauth_token.access_token)
-            self._token_expiry = datetime.now(timezone.utc) + timedelta(
-                seconds=oauth_token.expires_in
-            )
-
-            # Store in distributed cache with TTL
-            ttl = oauth_token.expires_in - 60  # 60s buffer before expiration
-            expires_at = datetime.now(timezone.utc).timestamp() + oauth_token.expires_in
-            self._cache.set(
-                cache_key,
-                {
-                    "access_token": oauth_token.access_token,
-                    "expires_at": expires_at,
-                },
-                ttl=ttl if ttl > 0 else oauth_token.expires_in,
-            )
-
-            # Validate token if provider supports it
-            if not self.provider.validate_token(oauth_token.access_token):
-                # Log security event for validation failure
-                structured_logger.security_event(
-                    event_type="token_validation_failure",
-                    server=self.server_name,
-                    provider=self.provider.provider_name,
-                )
-
-                raise TokenAcquisitionError(
-                    ErrorCode.TOKEN_VALIDATION_FAILED,
-                    "Token validation failed",
-                    details={
-                        "server": self.server_name,
-                        "provider": self.provider.provider_name,
-                    },
-                )
-
-            # Log successful authentication
-            structured_logger.security_event(
-                event_type="auth_success",
-                server=self.server_name,
-                provider=self.provider.provider_name,
-                expires_in_seconds=oauth_token.expires_in,
-            )
-
-            structured_logger.info(
-                "Token acquired and validated",
-                server=self.server_name,
-                operation="acquire_token",
-                provider=self.provider.provider_name,
-                expires_in_seconds=oauth_token.expires_in,
-            )
-            logger.info(
-                f"Token acquired for server '{self.server_name}', "
-                f"expires in {oauth_token.expires_in} seconds"
-            )
-
-            cached_token = self._get_cached_token()
-            assert cached_token is not None
-            return cached_token
 
         try:
-            return cast(str, self._retry_config.execute(attempt_acquire))
+            return cast(
+                str,
+                self._retry_config.execute(self._attempt_acquire),
+            )
         except (TokenAcquisitionError, NetworkError):
-            # Re-raise structured errors as-is (they already have error codes)
             raise
         except Exception as e:
             error_msg = f"Failed to acquire token for server '{self.server_name}': {e}"
 
-            # Log security event for auth failure
             structured_logger.security_event(
                 event_type="auth_failure",
                 server=self.server_name,
@@ -476,78 +548,10 @@ class TokenManager:
         """Legacy token acquisition with hardcoded exponential backoff."""
         max_retries = MAX_TOKEN_ACQUISITION_RETRIES
         retry_delay = INITIAL_RETRY_DELAY_SECONDS
-        cache_key = f"token:{self.server_name}"
 
         for attempt in range(max_retries):
             try:
-                # Use provider to acquire token
-                oauth_token = self.provider.acquire_token()
-
-                # Cache encrypted token locally (backward compatibility)
-                self._set_cached_token(oauth_token.access_token)
-                self._token_expiry = datetime.now(timezone.utc) + timedelta(
-                    seconds=oauth_token.expires_in
-                )
-
-                # Store in distributed cache with TTL
-                ttl = oauth_token.expires_in - 60  # 60s buffer before expiration
-                expires_at = (
-                    datetime.now(timezone.utc).timestamp() + oauth_token.expires_in
-                )
-                self._cache.set(
-                    cache_key,
-                    {
-                        "access_token": oauth_token.access_token,
-                        "expires_at": expires_at,
-                    },
-                    ttl=ttl if ttl > 0 else oauth_token.expires_in,
-                )
-
-                # Validate token if provider supports it
-                if not self.provider.validate_token(oauth_token.access_token):
-                    # Log security event for validation failure
-                    structured_logger.security_event(
-                        event_type="token_validation_failure",
-                        server=self.server_name,
-                        provider=self.provider.provider_name,
-                        attempt=attempt + 1,
-                    )
-
-                    raise TokenAcquisitionError(
-                        ErrorCode.TOKEN_VALIDATION_FAILED,
-                        "Token validation failed",
-                        details={
-                            "server": self.server_name,
-                            "provider": self.provider.provider_name,
-                            "attempt": attempt + 1,
-                        },
-                    )
-
-                # Log successful authentication
-                structured_logger.security_event(
-                    event_type="auth_success",
-                    server=self.server_name,
-                    provider=self.provider.provider_name,
-                    expires_in_seconds=oauth_token.expires_in,
-                    attempt=attempt + 1,
-                )
-
-                structured_logger.info(
-                    "Token acquired and validated",
-                    server=self.server_name,
-                    operation="acquire_token",
-                    provider=self.provider.provider_name,
-                    expires_in_seconds=oauth_token.expires_in,
-                    attempt=attempt + 1,
-                )
-                logger.info(
-                    f"Token acquired for server '{self.server_name}', "
-                    f"expires in {oauth_token.expires_in} seconds"
-                )
-
-                cached_token = self._get_cached_token()
-                assert cached_token is not None
-                return cached_token
+                return self._attempt_acquire(attempt=attempt + 1)
 
             except (requests.Timeout, requests.ConnectionError, NetworkError) as e:
                 if attempt < max_retries - 1:
@@ -576,7 +580,6 @@ class TokenManager:
                         f"after {max_retries} attempts: {e}"
                     )
 
-                    # Log security event for auth failure
                     structured_logger.security_event(
                         event_type="auth_failure",
                         server=self.server_name,
@@ -608,16 +611,13 @@ class TokenManager:
                     ) from e
 
             except (TokenAcquisitionError, NetworkError):
-                # Provider-specific errors with error codes, re-raise immediately
                 raise
 
             except Exception as e:
-                # Unexpected errors
                 error_msg = (
                     f"Failed to acquire token for server '{self.server_name}': {e}"
                 )
 
-                # Log security event for auth failure
                 structured_logger.security_event(
                     event_type="auth_failure",
                     server=self.server_name,

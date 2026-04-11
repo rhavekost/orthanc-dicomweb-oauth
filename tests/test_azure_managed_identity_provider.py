@@ -102,3 +102,50 @@ def test_validate_token():
 
     # Managed identity tokens are pre-validated by Azure
     assert provider.validate_token("any-token") is True
+
+
+@patch("azure.identity.DefaultAzureCredential")
+@patch("src.oauth_providers.managed_identity.time")
+def test_acquire_token_expiring_too_soon(mock_time, mock_credential_class):
+    """Test that tokens expiring within 60 seconds are rejected."""
+    current_time = 1000000
+    mock_time.time.return_value = current_time
+
+    mock_credential = Mock()
+    mock_token = Mock()
+    mock_token.token = "short_lived_token"
+    mock_token.expires_on = current_time + 30  # Expires in 30 seconds (< 60)
+    mock_credential.get_token.return_value = mock_token
+    mock_credential_class.return_value = mock_credential
+
+    config = {"Scope": "https://dicom.healthcareapis.azure.com/.default"}
+    provider = AzureManagedIdentityProvider(config)
+
+    with pytest.raises(TokenAcquisitionError) as exc_info:
+        provider.acquire_token()
+
+    assert exc_info.value.error_code == ErrorCode.TOKEN_ACQUISITION_FAILED
+    assert "expiring too soon" in str(exc_info.value)
+
+
+@patch("azure.identity.DefaultAzureCredential")
+@patch("src.oauth_providers.managed_identity.time")
+def test_acquire_token_exactly_at_threshold(mock_time, mock_credential_class):
+    """Test that tokens expiring in exactly 0 seconds are rejected."""
+    current_time = 1000000
+    mock_time.time.return_value = current_time
+
+    mock_credential = Mock()
+    mock_token = Mock()
+    mock_token.token = "expired_token"
+    mock_token.expires_on = current_time  # Already expired
+    mock_credential.get_token.return_value = mock_token
+    mock_credential_class.return_value = mock_credential
+
+    config = {"Scope": "https://dicom.healthcareapis.azure.com/.default"}
+    provider = AzureManagedIdentityProvider(config)
+
+    with pytest.raises(TokenAcquisitionError) as exc_info:
+        provider.acquire_token()
+
+    assert "expiring too soon" in str(exc_info.value)
