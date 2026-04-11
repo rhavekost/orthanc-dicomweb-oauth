@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import jwt as pyjwt
 from jwt.exceptions import InvalidTokenError
+from jwt.jwks_client import PyJWKClient as _PyJWKClient
 
 from src.jwt_validator import JWTValidator
 from src.oauth_providers.base import OAuthConfig
@@ -68,7 +69,7 @@ class AzureOAuthProvider(GenericOAuth2Provider):
         # calls rather than making a network round-trip on every invocation.
         # PyJWKClient (PyJWT >= 2.4) uses an internal threading.Lock for its
         # key cache, so concurrent calls to get_signing_key_from_jwt are safe.
-        self._jwks_client = pyjwt.PyJWKClient(self.jwks_uri)
+        self._jwks_client = _PyJWKClient(self.jwks_uri)
 
         # The 'common' endpoint issues tokens whose 'iss' contains the real
         # tenant GUID, never the literal string 'common'. Issuer verification

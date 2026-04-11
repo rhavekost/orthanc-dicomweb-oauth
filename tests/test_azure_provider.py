@@ -21,7 +21,7 @@ def mock_jwks_client():
     tests) should patch PyJWKClient themselves inside a narrower context and
     the autouse patch will be superseded for that scope.
     """
-    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient"):
+    with patch("src.oauth_providers.azure._PyJWKClient"):
         yield
 
 
@@ -197,7 +197,7 @@ def test_azure_provider_validate_token_with_jwks() -> None:
     mock_jwk = Mock()
     mock_jwk.key = public_key
 
-    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient") as mock_client_cls:
+    with patch("src.oauth_providers.azure._PyJWKClient") as mock_client_cls:
         mock_client = Mock()
         mock_client.get_signing_key_from_jwt.return_value = mock_jwk
         mock_client_cls.return_value = mock_client
@@ -318,7 +318,7 @@ def test_azure_provider_common_tenant_skips_issuer_verification() -> None:
         "ClientSecret": "client-secret",
     }
 
-    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient"):
+    with patch("src.oauth_providers.azure._PyJWKClient"):
         provider = AzureOAuthProvider(config)
 
     assert provider.tenant_id == "common"
@@ -336,7 +336,7 @@ def test_azure_provider_specific_tenant_enables_issuer_verification() -> None:
         "ClientSecret": "client-secret",
     }
 
-    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient"):
+    with patch("src.oauth_providers.azure._PyJWKClient"):
         provider = AzureOAuthProvider(config)
 
     assert provider._verify_issuer is True
@@ -363,7 +363,7 @@ def test_azure_provider_jwks_client_reused_across_validate_calls() -> None:
     mock_jwk = Mock()
     mock_jwk.key = public_key
 
-    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient") as mock_client_cls:
+    with patch("src.oauth_providers.azure._PyJWKClient") as mock_client_cls:
         mock_client = Mock()
         mock_client.get_signing_key_from_jwt.return_value = mock_jwk
         mock_client_cls.return_value = mock_client
