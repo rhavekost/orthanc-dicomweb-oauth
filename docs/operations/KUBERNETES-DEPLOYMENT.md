@@ -1,5 +1,7 @@
 # Kubernetes Deployment Guide
 
+> **Note:** This deployment guide has not been end-to-end tested in a live cluster. It is provided as a reference implementation. Please open an [issue](https://github.com/rhavekost/orthanc-dicomweb-oauth/issues) if you encounter problems.
+
 This guide provides best practices and examples for deploying Orthanc with OAuth plugin on Kubernetes.
 
 ## Architecture Overview

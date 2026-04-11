@@ -1,5 +1,7 @@
 # Kubernetes Deployment with Helm
 
+> **Note:** This Helm chart has not been end-to-end tested in a live cluster. It is provided as a reference implementation. Please open an [issue](https://github.com/rhavekost/orthanc-dicomweb-oauth/issues) if you encounter problems.
+
 Cloud-agnostic Helm chart for deploying Orthanc with DICOMweb OAuth plugin to any Kubernetes cluster.
 
 ## Supported Platforms
