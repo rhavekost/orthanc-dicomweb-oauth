@@ -71,6 +71,51 @@ The public key is in the `public_key` field.
 3. Claims validated (aud, iss, exp, nbf)
 4. Token cached only if validation passes
 
-## Disabling Validation
+## Azure Provider: Automatic JWKS Validation
 
-JWT validation is optional. If `JWTPublicKey` is not configured, tokens are not validated. This is **not recommended for production**.
+The Azure provider (`azure-ad`) automatically validates tokens using Azure's JWKS endpoint — no `JWTPublicKey` configuration required. It verifies:
+
+- **Signature** (RS256) against Azure's published public keys
+- **Expiration** (`exp` claim)
+- **Audience** (`aud` claim) — see note below
+- **Issuer** (`iss` claim) — see note below
+
+### Audience Verification
+
+Audience verification requires `Scope` to end in `/.default`:
+
+```json
+"Scope": "https://dicom.healthcareapis.azure.com/.default"
+```
+
+The `aud` claim in the token is the bare resource URL (e.g. `https://dicom.healthcareapis.azure.com`), derived by stripping the `/.default` suffix.
+
+If `Scope` does not end in `/.default`, audience verification is **skipped** and a warning is logged at startup:
+
+```
+Azure JWT audience verification is disabled because Scope does not end in '/.default'.
+Tokens for any Azure resource will pass validation.
+```
+
+### Common Tenant (`TenantId` not set)
+
+If `TenantId` is not configured, the provider defaults to the `common` multi-tenant endpoint. Issuer verification is automatically disabled in this case because Azure tokens carry the real tenant GUID in the `iss` claim — not the literal string `common`. A warning is logged:
+
+```
+Azure OAuth using multi-tenant 'common' endpoint. Healthcare deployments should
+specify a tenant_id for tenant-specific token validation.
+```
+
+For healthcare production deployments, always specify `TenantId`.
+
+### Disabling Azure JWKS Validation
+
+To disable Azure's automatic JWKS validation entirely (not recommended):
+
+```json
+"DisableJWTValidation": true
+```
+
+## Disabling Validation (Generic Providers)
+
+JWT validation is optional for generic providers. If `JWTPublicKey` is not configured, tokens are not validated. This is **not recommended for production**.

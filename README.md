@@ -693,7 +693,7 @@ MIT License - See LICENSE file for details
 
 See [CHANGELOG.md](CHANGELOG.md) for release history and version information.
 
-Current version: **2.1.0** (2026-02-07)
+Current version: **2.3.0** (2026-04-11)
 
 ## Acknowledgments
 
