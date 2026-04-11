@@ -2,9 +2,27 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
+
 from src.http_client import HttpClient, HttpResponse
 from src.oauth_providers.azure import AzureOAuthProvider
 from src.oauth_providers.base import OAuthConfig
+
+
+@pytest.fixture(autouse=True)
+def mock_jwks_client():
+    """Prevent real network calls to Azure JWKS endpoint in all tests.
+
+    AzureOAuthProvider.__init__ now caches a PyJWKClient instance. Without
+    this fixture every test that constructs a provider would make a live
+    network request to login.microsoftonline.com.
+
+    Tests that need to control key-lookup behaviour (e.g. validate_token
+    tests) should patch PyJWKClient themselves inside a narrower context and
+    the autouse patch will be superseded for that scope.
+    """
+    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient"):
+        yield
 
 
 def test_azure_provider_initialization_with_dict_config() -> None:
@@ -151,12 +169,10 @@ def test_azure_provider_validate_token_rejects_invalid_jwt() -> None:
     assert provider.validate_token("not_a_valid_jwt") is False
 
 
-def test_azure_provider_validate_token_with_jwks(
-) -> None:
+def test_azure_provider_validate_token_with_jwks() -> None:
     """Test that validate_token uses JWKS endpoint for validation."""
     import jwt as pyjwt
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.hazmat.primitives import serialization
 
     # Generate test RSA key pair
     private_key = rsa.generate_private_key(
@@ -175,22 +191,9 @@ def test_azure_provider_validate_token_with_jwks(
         "Scope": "https://dicom.healthcareapis.azure.com/.default",
     }
 
-    provider = AzureOAuthProvider(config)
-
-    # Create a valid JWT signed with our test key
-    token = pyjwt.encode(
-        {
-            "iss": "https://login.microsoftonline.com/tenant123/v2.0",
-            "aud": "https://dicom.healthcareapis.azure.com",
-            "exp": 9999999999,
-            "iat": 1000000000,
-        },
-        private_key,
-        algorithm="RS256",
-        headers={"kid": "test-key-id"},
-    )
-
-    # Mock PyJWKClient to return our test key
+    # Mock PyJWKClient at construction time so _jwks_client is the mock instance.
+    # The client is cached on the provider, so validate_token reuses it without
+    # making a new network call.
     mock_jwk = Mock()
     mock_jwk.key = public_key
 
@@ -199,10 +202,27 @@ def test_azure_provider_validate_token_with_jwks(
         mock_client.get_signing_key_from_jwt.return_value = mock_jwk
         mock_client_cls.return_value = mock_client
 
+        provider = AzureOAuthProvider(config)
+
+        # Create a valid JWT signed with our test key
+        token = pyjwt.encode(
+            {
+                "iss": "https://login.microsoftonline.com/tenant123/v2.0",
+                "aud": "https://dicom.healthcareapis.azure.com",
+                "exp": 9999999999,
+                "iat": 1000000000,
+            },
+            private_key,
+            algorithm="RS256",
+            headers={"kid": "test-key-id"},
+        )
+
         result = provider.validate_token(token)
 
     assert result is True
+    # PyJWKClient constructed once (at __init__), not on every validate_token call
     mock_client_cls.assert_called_once_with(provider.jwks_uri)
+    mock_client.get_signing_key_from_jwt.assert_called_once_with(token)
 
 
 def test_azure_provider_audience_from_scope() -> None:
@@ -256,6 +276,92 @@ def test_azure_provider_specific_tenant_no_warning() -> None:
     assert provider.tenant_id == "my-tenant"
     # Warning should not have been called (info calls from JWT setup are ok)
     mock_logger.warning.assert_not_called()
+
+
+def test_azure_provider_common_tenant_skips_issuer_verification() -> None:
+    """Test that common tenant disables issuer verification.
+
+    Azure tokens issued via the 'common' endpoint carry the real tenant GUID
+    in the 'iss' claim, not the literal string 'common'. Verifying against
+    a static issuer of 'common' would always fail, so _verify_issuer must
+    be False when tenant_id == 'common'.
+    """
+    config = {
+        "TokenEndpoint": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+    }
+
+    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient"):
+        provider = AzureOAuthProvider(config)
+
+    assert provider.tenant_id == "common"
+    assert provider._verify_issuer is False
+
+
+def test_azure_provider_specific_tenant_enables_issuer_verification() -> None:
+    """Test that a specific tenant enables issuer verification."""
+    config = {
+        "TokenEndpoint": (
+            "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token"
+        ),
+        "TenantId": "tenant123",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+    }
+
+    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient"):
+        provider = AzureOAuthProvider(config)
+
+    assert provider._verify_issuer is True
+
+
+def test_azure_provider_jwks_client_reused_across_validate_calls() -> None:
+    """Test that PyJWKClient is constructed once and reused, not per-call."""
+    import jwt as pyjwt
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_key = private_key.public_key()
+
+    config = {
+        "TokenEndpoint": (
+            "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token"
+        ),
+        "TenantId": "tenant123",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
+    }
+
+    mock_jwk = Mock()
+    mock_jwk.key = public_key
+
+    with patch("src.oauth_providers.azure.pyjwt.PyJWKClient") as mock_client_cls:
+        mock_client = Mock()
+        mock_client.get_signing_key_from_jwt.return_value = mock_jwk
+        mock_client_cls.return_value = mock_client
+
+        provider = AzureOAuthProvider(config)
+
+        token = pyjwt.encode(
+            {
+                "iss": "https://login.microsoftonline.com/tenant123/v2.0",
+                "aud": "https://dicom.healthcareapis.azure.com",
+                "exp": 9999999999,
+                "iat": 1000000000,
+            },
+            private_key,
+            algorithm="RS256",
+        )
+
+        provider.validate_token(token)
+        provider.validate_token(token)
+
+    # PyJWKClient should be constructed exactly once (in __init__), regardless
+    # of how many times validate_token is called.
+    assert mock_client_cls.call_count == 1
+    assert mock_client.get_signing_key_from_jwt.call_count == 2
 
 
 def test_azure_provider_inherits_generic_acquire_token() -> None:

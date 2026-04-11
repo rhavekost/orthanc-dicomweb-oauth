@@ -1,5 +1,4 @@
 import threading
-from unittest.mock import Mock, patch
 
 import pytest
 import responses
@@ -293,7 +292,6 @@ def test_concurrent_get_token_no_thundering_herd() -> None:
     import time
 
     call_count = 0
-    original_post = responses.calls
 
     # Simulate a slow token endpoint
     def slow_token_callback(request):
@@ -303,7 +301,8 @@ def test_concurrent_get_token_no_thundering_herd() -> None:
         return (
             200,
             {},
-            '{"access_token": "concurrent_token", "token_type": "Bearer", "expires_in": 3600}',
+            '{"access_token": "concurrent_token", '
+            '"token_type": "Bearer", "expires_in": 3600}',
         )
 
     responses.add_callback(
@@ -367,4 +366,87 @@ def test_token_pending_flag_cleared_on_failure() -> None:
         manager.get_token()
 
     # Pending flag must be cleared so next caller can attempt
+    assert manager._token_pending is False
+
+
+@responses.activate  # type: ignore[misc]
+def test_concurrent_get_token_acquirer_failure_no_thundering_herd() -> None:
+    """Test that when the acquiring thread fails, waiting threads elect exactly
+    one new acquirer rather than all racing simultaneously.
+
+    Uses a barrier to guarantee all threads are inside wait() before the first
+    acquirer's network call completes, making the race deterministic.
+    """
+    import time
+
+    NUM_THREADS = 4
+    call_count = 0
+    # Barrier: acquirer thread + (NUM_THREADS-1) waiting threads all rendezvous
+    # before the first HTTP response is returned. This guarantees all waiters
+    # are inside wait() when notify_all() fires.
+    barrier = threading.Barrier(NUM_THREADS)
+
+    def flaky_token_callback(request):
+        nonlocal call_count
+        call_count += 1
+        is_first = call_count == 1
+        if is_first:
+            # Wait until all other threads are blocked in wait() before failing,
+            # ensuring the thundering-herd guard is exercised.
+            barrier.wait(timeout=5)
+        if is_first:
+            return (500, {}, '{"error": "server_error"}')
+        return (
+            200,
+            {},
+            '{"access_token": "recovered_token", '
+            '"token_type": "Bearer", "expires_in": 3600}',
+        )
+
+    responses.add_callback(
+        responses.POST,
+        "https://login.example.com/oauth2/token",
+        callback=flaky_token_callback,
+    )
+
+    config = {
+        "TokenEndpoint": "https://login.example.com/oauth2/token",
+        "ClientId": "client123",
+        "ClientSecret": "secret456",
+        "Scope": "scope",
+    }
+
+    manager = TokenManager("test-server", config)
+    results = []
+    errors = []
+
+    def get_token_thread():
+        try:
+            token = manager.get_token()
+            results.append(token)
+        except TokenAcquisitionError as e:
+            errors.append(e)
+
+    # Launch threads: first becomes acquirer, rest block in wait() then
+    # meet the acquirer at the barrier before the failure response is returned.
+    threads = [threading.Thread(target=get_token_thread) for _ in range(NUM_THREADS)]
+
+    # Start acquirer first so it sets _token_pending=True before waiters check
+    threads[0].start()
+    # Give acquirer time to enter get_token and set _token_pending
+    time.sleep(0.05)
+    for t in threads[1:]:
+        t.start()
+
+    for t in threads:
+        t.join(timeout=10)
+
+    # Only 2 HTTP calls should be made: 1 failure + 1 successful retry by the
+    # elected replacement acquirer. All other woken threads should re-wait and
+    # then hit the cache.
+    assert call_count == 2, (
+        f"Expected exactly 2 HTTP calls (1 fail + 1 retry), got {call_count}. "
+        "Thundering herd detected: multiple threads raced after acquirer failure."
+    )
+    assert all(r == "recovered_token" for r in results), f"Unexpected tokens: {results}"
     assert manager._token_pending is False

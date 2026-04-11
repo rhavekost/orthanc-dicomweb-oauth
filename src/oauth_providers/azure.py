@@ -6,7 +6,7 @@ import jwt as pyjwt
 from jwt.exceptions import InvalidTokenError
 
 from src.jwt_validator import JWTValidator
-from src.oauth_providers.base import OAuthConfig, OAuthProvider
+from src.oauth_providers.base import OAuthConfig
 from src.oauth_providers.generic import GenericOAuth2Provider
 from src.structured_logger import structured_logger
 
@@ -64,6 +64,16 @@ class AzureOAuthProvider(GenericOAuth2Provider):
         )
         self.issuer = f"https://login.microsoftonline.com/{tenant_id}/v2.0"
 
+        # Cache the JWKS client so it reuses fetched keys across calls rather
+        # than making a network round-trip on every validate_token invocation.
+        self._jwks_client = pyjwt.PyJWKClient(self.jwks_uri)
+
+        # The 'common' endpoint issues tokens whose 'iss' contains the real
+        # tenant GUID, never the literal string 'common'. Issuer verification
+        # against a static self.issuer would always fail for common-tenant
+        # deployments, so we disable it and rely on signature + expiry checks.
+        self._verify_issuer = tenant_id != "common"
+
         # Derive audience from scope: strip /.default suffix for aud validation
         self._expected_audience: Optional[str] = None
         scope = oauth_config.scope
@@ -73,9 +83,7 @@ class AzureOAuthProvider(GenericOAuth2Provider):
         # Check if JWT validation is explicitly disabled in config
         self._jwt_validation_disabled = False
         if isinstance(config, dict):
-            self._jwt_validation_disabled = config.get(
-                "DisableJWTValidation", False
-            )
+            self._jwt_validation_disabled = config.get("DisableJWTValidation", False)
 
         # Initialize JWT validator for Azure
         if isinstance(config, dict):
@@ -136,17 +144,19 @@ class AzureOAuthProvider(GenericOAuth2Provider):
             result: bool = self.jwt_validator.validate(token)
             return result
 
-        # Attempt JWKS-based validation from Azure endpoint
+        # Attempt JWKS-based validation using the cached client (no per-call
+        # network fetch unless the key has rotated).
         try:
-            jwks_client = pyjwt.PyJWKClient(self.jwks_uri)
-            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            signing_key = self._jwks_client.get_signing_key_from_jwt(token)
 
             decode_options = {
                 "verify_signature": True,
                 "verify_exp": True,
                 "verify_nbf": True,
                 "verify_aud": self._expected_audience is not None,
-                "verify_iss": True,
+                # Skip issuer check for 'common' tenant: Azure tokens carry
+                # the real tenant GUID in 'iss', not the literal 'common'.
+                "verify_iss": self._verify_issuer,
             }
 
             pyjwt.decode(
@@ -154,14 +164,14 @@ class AzureOAuthProvider(GenericOAuth2Provider):
                 key=signing_key.key,
                 algorithms=["RS256"],
                 audience=self._expected_audience,
-                issuer=self.issuer,
+                issuer=self.issuer if self._verify_issuer else None,
                 options=decode_options,
             )
 
             structured_logger.debug(
                 "Azure JWT validation successful",
                 provider=self.provider_name,
-                issuer=self.issuer,
+                issuer=self.issuer if self._verify_issuer else "common (not verified)",
                 audience=self._expected_audience,
             )
             return True

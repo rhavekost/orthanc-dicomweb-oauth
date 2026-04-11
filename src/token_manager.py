@@ -279,9 +279,7 @@ class TokenManager:
                 cached=True,
                 cache_type="local",
             )
-            logger.debug(
-                f"Using local cached token for server '{self.server_name}'"
-            )
+            logger.debug(f"Using local cached token for server '{self.server_name}'")
 
             cached_token = self._get_cached_token()
             assert cached_token is not None  # Validated by _is_token_valid
@@ -308,7 +306,6 @@ class TokenManager:
             TokenAcquisitionError: If token acquisition fails
         """
         metrics = MetricsCollector.get_instance()
-        should_acquire = False
 
         with self._token_condition:
             # Check caches first
@@ -316,9 +313,14 @@ class TokenManager:
             if cached is not None:
                 return cached
 
-            # No cached token available - check if another thread is already fetching
-            if self._token_pending:
-                # Wait for the other thread to finish acquiring
+            # No cached token available. If another thread is already fetching,
+            # wait until it finishes then re-evaluate. Loop handles:
+            # (a) spurious wakeups, and
+            # (b) the case where the acquirer failed — woken threads compete
+            #     for the lock one-at-a-time; the first to see _token_pending=False
+            #     becomes the new acquirer and sets it back to True before
+            #     releasing the lock, so the rest continue waiting.
+            while self._token_pending:
                 structured_logger.debug(
                     "Waiting for pending token acquisition",
                     server=self.server_name,
@@ -326,44 +328,34 @@ class TokenManager:
                 )
                 self._token_condition.wait()
 
-                # Re-check caches after being notified
+                # Re-check cache after being notified (acquirer may have succeeded)
                 cached = self._check_caches()
                 if cached is not None:
                     return cached
 
-                # If still no valid token after wait, fall through to acquire
-                # (the other thread's acquisition may have failed)
+                # Cache still empty — loop: if another woken thread already set
+                # _token_pending=True we will wait again; otherwise we exit and
+                # become the acquirer.
 
-            # Record cache miss and mark ourselves as the acquirer
+            # We hold the lock and _token_pending is False — we are the acquirer.
             metrics.record_cache_miss(self.server_name)
             self._token_pending = True
-            should_acquire = True
 
         # Acquire token outside the lock to avoid blocking other callers
-        if should_acquire:
-            try:
-                structured_logger.info(
-                    "Acquiring new token",
-                    server=self.server_name,
-                    operation="get_token",
-                    cached=False,
-                )
-                logger.info(f"Acquiring new token for server '{self.server_name}'")
-                token = self._acquire_token()
-                return token
-            finally:
-                with self._token_condition:
-                    self._token_pending = False
-                    self._token_condition.notify_all()
-
-        # Fallback: should not reach here, but acquire if we do
-        structured_logger.info(
-            "Acquiring new token (fallback)",
-            server=self.server_name,
-            operation="get_token",
-            cached=False,
-        )
-        return self._acquire_token()
+        try:
+            structured_logger.info(
+                "Acquiring new token",
+                server=self.server_name,
+                operation="get_token",
+                cached=False,
+            )
+            logger.info(f"Acquiring new token for server '{self.server_name}'")
+            token = self._acquire_token()
+            return token
+        finally:
+            with self._token_condition:
+                self._token_pending = False
+                self._token_condition.notify_all()
 
     def _is_token_valid(self) -> bool:
         """Check if cached token exists and is not expiring soon."""
