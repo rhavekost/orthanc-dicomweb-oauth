@@ -438,25 +438,10 @@ class TokenManager:
 
         oauth_token = self.provider.acquire_token()
 
-        # Cache encrypted token locally (backward compatibility)
-        self._set_cached_token(oauth_token.access_token)
-        self._token_expiry = datetime.now(timezone.utc) + timedelta(
-            seconds=oauth_token.expires_in
-        )
-
-        # Store in distributed cache with TTL
-        ttl = oauth_token.expires_in - 60  # 60s buffer before expiration
-        expires_at = datetime.now(timezone.utc).timestamp() + oauth_token.expires_in
-        self._cache.set(
-            cache_key,
-            {
-                "access_token": oauth_token.access_token,
-                "expires_at": expires_at,
-            },
-            ttl=ttl if ttl > 0 else oauth_token.expires_in,
-        )
-
-        # Validate token if provider supports it
+        # Validate BEFORE caching: an invalid token must never be written to
+        # the local or distributed cache. If we cached first and validation
+        # failed, waiting threads would wake up, hit the cache, and receive an
+        # unvalidated token without ever going through validate_token.
         if not self.provider.validate_token(oauth_token.access_token):
             structured_logger.security_event(
                 event_type="token_validation_failure",
@@ -474,6 +459,23 @@ class TokenManager:
                     **extra_log_fields,
                 },
             )
+
+        # Token is valid — write to local and distributed caches
+        self._set_cached_token(oauth_token.access_token)
+        self._token_expiry = datetime.now(timezone.utc) + timedelta(
+            seconds=oauth_token.expires_in
+        )
+
+        ttl = oauth_token.expires_in - 60  # 60s buffer before expiration
+        expires_at = datetime.now(timezone.utc).timestamp() + oauth_token.expires_in
+        self._cache.set(
+            cache_key,
+            {
+                "access_token": oauth_token.access_token,
+                "expires_at": expires_at,
+            },
+            ttl=ttl if ttl > 0 else oauth_token.expires_in,
+        )
 
         # Log successful authentication
         structured_logger.security_event(

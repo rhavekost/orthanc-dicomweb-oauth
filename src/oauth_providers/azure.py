@@ -64,8 +64,10 @@ class AzureOAuthProvider(GenericOAuth2Provider):
         )
         self.issuer = f"https://login.microsoftonline.com/{tenant_id}/v2.0"
 
-        # Cache the JWKS client so it reuses fetched keys across calls rather
-        # than making a network round-trip on every validate_token invocation.
+        # Cache the JWKS client so validate_token reuses fetched keys across
+        # calls rather than making a network round-trip on every invocation.
+        # PyJWKClient (PyJWT >= 2.4) uses an internal threading.Lock for its
+        # key cache, so concurrent calls to get_signing_key_from_jwt are safe.
         self._jwks_client = pyjwt.PyJWKClient(self.jwks_uri)
 
         # The 'common' endpoint issues tokens whose 'iss' contains the real
@@ -74,7 +76,11 @@ class AzureOAuthProvider(GenericOAuth2Provider):
         # deployments, so we disable it and rely on signature + expiry checks.
         self._verify_issuer = tenant_id != "common"
 
-        # Derive audience from scope: strip /.default suffix for aud validation
+        # Derive audience from scope: strip /.default suffix for aud validation.
+        # Azure client-credentials scopes are typically <resource>/.default and
+        # the token aud claim is the bare resource URL.
+        # If scope has no /.default suffix, audience verification is skipped and
+        # a warning is emitted below to make the degraded validation visible.
         self._expected_audience: Optional[str] = None
         scope = oauth_config.scope
         if scope and scope.endswith("/.default"):
@@ -106,7 +112,7 @@ class AzureOAuthProvider(GenericOAuth2Provider):
                     issuer=jwt_issuer,
                 )
 
-        # P6: Warn when defaulting to 'common' tenant
+        # Warn when defaulting to 'common' tenant (no issuer verification)
         if tenant_id == "common":
             structured_logger.warning(
                 "Azure OAuth using multi-tenant 'common' endpoint. "
@@ -114,6 +120,21 @@ class AzureOAuthProvider(GenericOAuth2Provider):
                 "tenant-specific token validation.",
                 provider=self.provider_name,
                 tenant_id=tenant_id,
+            )
+
+        # Warn when audience verification will be skipped. This happens when
+        # Scope does not end in '/.default' so _expected_audience is None.
+        # Without audience checking, any token signed by Azure JWKS keys will
+        # pass, including tokens issued for unrelated resources (e.g. MS Graph).
+        # To silence this warning, use a scope ending in '/.default' or set
+        # DisableJWTValidation=true if you explicitly accept signature-only checks.
+        if not self._jwt_validation_disabled and self._expected_audience is None:
+            structured_logger.warning(
+                "Azure JWT audience verification is disabled because Scope does "
+                "not end in '/.default'. Tokens for any Azure resource will pass "
+                "validation. Use a '/.default' scope to enable audience checking.",
+                provider=self.provider_name,
+                scope=scope,
             )
 
     @property

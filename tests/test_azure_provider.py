@@ -242,7 +242,11 @@ def test_azure_provider_audience_from_scope() -> None:
 
 
 def test_azure_provider_common_tenant_logs_warning() -> None:
-    """Test that defaulting to 'common' tenant logs a warning."""
+    """Test that defaulting to 'common' tenant logs a tenant warning.
+
+    Two warnings are expected: one for the common tenant and one for
+    missing audience verification (no /.default scope in this config).
+    """
     config = {
         "TokenEndpoint": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
         "ClientId": "client-id",
@@ -253,14 +257,14 @@ def test_azure_provider_common_tenant_logs_warning() -> None:
         provider = AzureOAuthProvider(config)
 
     assert provider.tenant_id == "common"
-    mock_logger.warning.assert_called()
-    warning_msg = mock_logger.warning.call_args[0][0]
-    assert "common" in warning_msg
-    assert "tenant_id" in warning_msg or "tenant" in warning_msg.lower()
+    all_warning_msgs = [call[0][0] for call in mock_logger.warning.call_args_list]
+    assert any(
+        "common" in msg for msg in all_warning_msgs
+    ), "Expected a warning about the 'common' tenant"
 
 
-def test_azure_provider_specific_tenant_no_warning() -> None:
-    """Test that specific tenant_id does not log a warning."""
+def test_azure_provider_specific_tenant_no_warning_with_default_scope() -> None:
+    """Test that a specific tenant with a /.default scope logs no warnings."""
     config = {
         "TokenEndpoint": (
             "https://login.microsoftonline.com/my-tenant/oauth2/v2.0/token"
@@ -268,14 +272,36 @@ def test_azure_provider_specific_tenant_no_warning() -> None:
         "TenantId": "my-tenant",
         "ClientId": "client-id",
         "ClientSecret": "client-secret",
+        "Scope": "https://dicom.healthcareapis.azure.com/.default",
     }
 
     with patch("src.oauth_providers.azure.structured_logger") as mock_logger:
         provider = AzureOAuthProvider(config)
 
     assert provider.tenant_id == "my-tenant"
-    # Warning should not have been called (info calls from JWT setup are ok)
     mock_logger.warning.assert_not_called()
+
+
+def test_azure_provider_specific_tenant_warns_when_no_default_scope() -> None:
+    """Test that a specific tenant without /.default scope warns about audience."""
+    config = {
+        "TokenEndpoint": (
+            "https://login.microsoftonline.com/my-tenant/oauth2/v2.0/token"
+        ),
+        "TenantId": "my-tenant",
+        "ClientId": "client-id",
+        "ClientSecret": "client-secret",
+        # No Scope — audience verification will be skipped
+    }
+
+    with patch("src.oauth_providers.azure.structured_logger") as mock_logger:
+        provider = AzureOAuthProvider(config)
+
+    assert provider.tenant_id == "my-tenant"
+    all_warning_msgs = [call[0][0] for call in mock_logger.warning.call_args_list]
+    assert any(
+        "audience" in msg.lower() for msg in all_warning_msgs
+    ), "Expected a warning about disabled audience verification"
 
 
 def test_azure_provider_common_tenant_skips_issuer_verification() -> None:
