@@ -71,7 +71,7 @@ spec:
 
 Pin to a specific version in production instead of `latest-plugin`:
 ```yaml
-image: rhavekost/orthanc-dicomweb-oauth:2.2.2-plugin
+image: rhavekost/orthanc-dicomweb-oauth:2.3.0-plugin
 ```
 
 ### Method 1: Helm Chart (Recommended)
@@ -87,7 +87,7 @@ helm install orthanc-oauth ./kubernetes/helm \
 **Upgrade:**
 ```bash
 helm upgrade orthanc-oauth ./kubernetes/helm \
-  --set image.tag="2.2.2"
+  --set image.tag="2.3.0"
 ```
 
 **Uninstall:**
@@ -114,7 +114,7 @@ replicaCount: 3
 
 image:
   repository: your-registry/orthanc-oauth
-  tag: "2.2.2"
+  tag: "2.3.0"
   pullPolicy: IfNotPresent
 
 oauth:

@@ -15,7 +15,7 @@ Enables [Orthanc](https://www.orthanc-server.com/) to transparently connect to O
 | `latest` | Standalone image: Orthanc + Python plugin + all dependencies |
 | `X.Y.Z` | Pinned version of standalone image |
 
-**Recommended for production:** pin to a specific version, e.g. `2.2.2-plugin`
+**Recommended for production:** pin to a specific version, e.g. `2.3.0-plugin`
 
 ---
 
@@ -40,7 +40,7 @@ services:
         condition: service_completed_successfully
 
   plugin-install:
-    image: rhavekost/orthanc-dicomweb-oauth:2.2.2-plugin
+    image: rhavekost/orthanc-dicomweb-oauth:2.3.0-plugin
     command: ["sh", "-c", "cp -r /plugin/. /target/"]
     volumes:
       - plugin-volume:/target
@@ -54,7 +54,7 @@ volumes:
 ```yaml
 initContainers:
   - name: plugin-install
-    image: rhavekost/orthanc-dicomweb-oauth:2.2.2-plugin
+    image: rhavekost/orthanc-dicomweb-oauth:2.3.0-plugin
     command: ["sh", "-c", "cp -r /plugin/. /target/"]
     volumeMounts:
       - name: plugin-volume
@@ -77,7 +77,7 @@ containers:
 docker run -d \
   -p 8042:8042 \
   -v /path/to/orthanc.json:/etc/orthanc/orthanc.json \
-  rhavekost/orthanc-dicomweb-oauth:2.2.2
+  rhavekost/orthanc-dicomweb-oauth:2.3.0
 ```
 
 ---
