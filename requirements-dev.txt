@@ -10,7 +10,7 @@ flake8==7.3.0
 mypy==1.20.0
 bandit==1.9.3
 isort==5.13.2
-types-requests==2.31.0.20240106
+types-requests==2.33.0.20260408
 types-PyJWT==1.7.1
 pylint==4.0.5
 radon==6.0.1
