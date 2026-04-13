@@ -73,7 +73,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push plugin-only image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile.plugin
@@ -114,7 +114,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push standalone image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
